@@ -8,7 +8,7 @@ export type ExportKind = "profile" | "job" | "sent";
 export interface CvSource {
   data: ProfileData;
   language: Language;
-  /** File name without extension, e.g. "Amar_Cutura_CV_Helvetia_Digital_AG". */
+  /** File name without extension, e.g. "Alex_Morgan_CV_Vandelay_Logistics". */
   fileBase: string;
 }
 

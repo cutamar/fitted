@@ -32,7 +32,7 @@ export function AddToCvForm({ job, target, onAdded, onCancel }: { job: Job; targ
       <Textarea
         autoFocus
         className="text-sm"
-        placeholder="What's true about this? e.g. “Set up Prometheus and Grafana dashboards for our Kubernetes clusters at Brands Are Live.” Leave empty to only use what your CV already says."
+        placeholder="What's true about this? e.g. “Set up Prometheus and Grafana dashboards for our Kubernetes clusters at Northwind Labs.” Leave empty to only use what your CV already says."
         value={details}
         onChange={(e) => setDetails(e.target.value)}
       />
