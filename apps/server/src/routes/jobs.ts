@@ -1,4 +1,4 @@
-import { Hono } from "hono";
+import { Hono, type Context } from "hono";
 import { z } from "zod";
 import { AppStatusSchema, computeScore, newId, unsupportedClaims, CreateJobSchema, SuggestionStatusSchema, acceptedKey, applySuggestions, tailoredData, type Job } from "@rb/shared";
 import { assess, analyzeJob, assessAndSuggest, boostQuestions, boostSuggestions, regenerateSuggestion, suggestForGap, writeCoverLetter, type BoostGap } from "../jobs/job-ai.ts";
@@ -206,6 +206,30 @@ export const jobRoutes = new Hono()
   /** Quick boost, step 2: turn "yes" answers into accepted changes; optionally accept safe open suggestions. */
   .post("/:id/boost/apply", async (c) => {
     const job = requireJob(c.req.param("id"));
+    if (applying.has(job.id)) return c.json({ error: "Your CV is already being updated. Wait a moment, then reload." }, 409);
+    applying.add(job.id);
+    try {
+      return await applyBoost(c, job);
+    } finally {
+      applying.delete(job.id);
+    }
+  })
+  .post("/:id/suggestions/:sid/regenerate", async (c) => {
+    const job = requireJob(c.req.param("id"));
+    const { instruction } = z.object({ instruction: z.string().default("") }).parse(await c.req.json().catch(() => ({})));
+    const original = job.suggestions.find((s) => s.id === c.req.param("sid"));
+    if (!original) return c.json({ error: "Suggestion not found" }, 404);
+    if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
+    const next = await regenerateSuggestion(job.base, job.analysis, job.language, original, instruction);
+    if (!next) return c.json({ error: "ChatGPT returned an unusable suggestion. Try rephrasing your feedback." }, 502);
+    // Re-read: the user may have changed other suggestions while this ran.
+    const fresh = requireJob(job.id);
+    return c.json(updateJob(job.id, { suggestions: fresh.suggestions.map((s) => (s.id === next.id ? next : s)) }));
+  });
+
+const applying = new Set<string>();
+
+async function applyBoost(c: Context, job: Job) {
     if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
     const body = z
       .object({
@@ -229,27 +253,21 @@ export const jobRoutes = new Hono()
     }
     let added: typeof suggestions = [];
     if (yes.length) {
+      const started = Date.now();
       added = await boostSuggestions(
         tailoredData(job.base, suggestions),
         job.analysis,
         job.language,
-        yes.map((q) => ({ label: q.label, requirementId: q.requirementId || undefined, statement: `${q.question} Yes.${q.details ? ` ${q.details}` : ""}` })),
+        yes.map((q) => ({
+          label: q.label,
+          requirementId: q.requirementId || undefined,
+          statement: `${q.question} Yes.${q.details ? ` User's detail: ${q.details}` : ""}`,
+        })),
       );
+      console.log(`Quick boost: ${yes.length} yes answers -> ${added.length} changes in ${Math.round((Date.now() - started) / 1000)}s`);
       added = added.map((s) => (s.requirementIds.length ? s : { ...s, requirementIds: [...new Set(yes.map((q) => q.requirementId).filter(Boolean))] }));
     }
     const fresh = requireJob(job.id);
     const merged = [...suggestions.filter((s) => fresh.suggestions.some((f) => f.id === s.id)), ...added];
     return c.json({ job: updateJob(job.id, { boost, suggestions: merged }), added: added.length, acceptedSafe });
-  })
-  .post("/:id/suggestions/:sid/regenerate", async (c) => {
-    const job = requireJob(c.req.param("id"));
-    const { instruction } = z.object({ instruction: z.string().default("") }).parse(await c.req.json().catch(() => ({})));
-    const original = job.suggestions.find((s) => s.id === c.req.param("sid"));
-    if (!original) return c.json({ error: "Suggestion not found" }, 404);
-    if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
-    const next = await regenerateSuggestion(job.base, job.analysis, job.language, original, instruction);
-    if (!next) return c.json({ error: "ChatGPT returned an unusable suggestion. Try rephrasing your feedback." }, 502);
-    // Re-read: the user may have changed other suggestions while this ran.
-    const fresh = requireJob(job.id);
-    return c.json(updateJob(job.id, { suggestions: fresh.suggestions.map((s) => (s.id === next.id ? next : s)) }));
-  });
+}

@@ -176,7 +176,7 @@ export function QuickBoost({ job, onClose }: { job: Job; onClose: () => void }) 
               <div className="flex items-center gap-2 border-t border-border pt-3">
                 <span className="mr-auto text-xs text-muted">
                   {apply.isPending
-                    ? "Updating your CV…"
+                    ? "Updating your CV… with many yes answers this takes 1–2 minutes."
                     : countdown !== null
                       ? `All answered. Updating your CV in a moment…`
                       : `${Object.keys(answers).filter((id) => open.some((q) => q.id === id)).length} of ${open.length} answered`}

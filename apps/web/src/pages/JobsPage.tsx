@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Briefcase, Plus, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router";
-import { computeScore, type Job } from "@rb/shared";
+import { computeScore, tailoredData, type Job } from "@rb/shared";
 import { StatusBadge } from "../components/Application";
 import { ScoreRing } from "../components/ScorePanel";
 import { Badge, Button, Card, Field, Notice, PageHeader, Select, Spinner, Textarea, cx } from "../components/ui";
@@ -37,7 +37,8 @@ export function JobsPage() {
 }
 
 function JobRow({ job }: { job: Job }) {
-  const score = job.analysis && job.base ? computeScore(job.base, job.analysis, job.assessment).overall : null;
+  // The tailored CV's score (accepted suggestions applied), same as on the job page.
+  const score = job.analysis && job.base ? computeScore(tailoredData(job.base, job.suggestions), job.analysis, job.assessment).overall : null;
   const accepted = job.suggestions.filter((s) => s.status === "accepted").length;
   return (
     <Link to={`/jobs/${job.id}`}>

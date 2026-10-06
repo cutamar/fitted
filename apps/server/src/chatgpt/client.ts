@@ -80,8 +80,34 @@ export interface GenerateOptions {
   signal?: AbortSignal;
 }
 
-/** Streams a response and returns the full output text once `response.completed` arrives. */
+/** Failures worth retrying: dropped streams, upstream 5xx, temporary unavailability. */
+const PERMANENT = new Set([
+  "subscription_sharing_user_not_eligible",
+  "subscription_sharing_usage_limit_exceeded",
+  "subscription_sharing_unsupported_capability",
+  "subscription_sharing_invalid_user",
+  "subscription_sharing_route_not_supported",
+]);
+function isTransient(err: unknown): boolean {
+  if (err instanceof ChatGPTError) return !PERMANENT.has(err.code) && (err.status >= 500 || err.code === "stream_ended" || err.code === "response_failed");
+  // fetch() network failures (connection reset mid-stream etc.)
+  return err instanceof TypeError || (err as { name?: string })?.name === "SocketError";
+}
+
+/** Streams a response; retries transient failures twice (long responses occasionally drop). */
 export async function generateText(opts: GenerateOptions): Promise<string> {
+  for (let attempt = 1; ; attempt++) {
+    try {
+      return await generateTextOnce(opts);
+    } catch (err) {
+      if (attempt >= 3 || opts.signal?.aborted || !isTransient(err)) throw err;
+      console.warn(`ChatGPT request failed (${(err as Error).message}); retry ${attempt}/2`);
+      await new Promise((r) => setTimeout(r, attempt * 2000));
+    }
+  }
+}
+
+async function generateTextOnce(opts: GenerateOptions): Promise<string> {
   const body: Record<string, unknown> = {
     model: await resolveModel(),
     instructions: opts.instructions,

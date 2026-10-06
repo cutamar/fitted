@@ -109,6 +109,12 @@ function describeAnalysis(a: JobAnalysis): string {
 }
 
 function toSuggestion(m: ModelSuggestion, resolve: (id: string) => string | null): Suggestion | null {
+  const s = validSuggestion(m, resolve);
+  if (!s) console.warn(`Dropped invalid suggestion: ${m.type} item=${m.itemId || "-"} block=${m.blockId || "-"} after=${m.afterBlockId || "-"} text=${m.text.length}ch tags=${m.tags.length}`);
+  return s;
+}
+
+function validSuggestion(m: ModelSuggestion, resolve: (id: string) => string | null): Suggestion | null {
   const itemId = m.itemId ? resolve(m.itemId) : null;
   const blockId = m.blockId ? resolve(m.blockId) : null;
   const afterBlockId = m.afterBlockId ? resolve(m.afterBlockId) : null;
@@ -321,26 +327,53 @@ export interface BoostFact {
   statement: string;
 }
 
-export async function boostSuggestions(data: ProfileData, analysis: JobAnalysis, language: Language, facts: BoostFact[]): Promise<Suggestion[]> {
-  const cv = cvForModel(data);
-  const out = await generateJson(z.object({ suggestions: z.array(ModelSuggestion) }), {
+const BoostSuggestion = ModelSuggestion.extend({
+  /** 1-based numbers of the confirmed facts this edit works in. */
+  facts: z.array(z.number()),
+});
+
+async function boostPass(cv: ReturnType<typeof cvForModel>, analysis: JobAnalysis, language: Language, facts: BoostFact[]) {
+  const out = await generateJson(z.object({ suggestions: z.array(BoostSuggestion) }), {
     name: "boost_suggestions",
-    instructions: `The candidate confirmed the facts below are TRUE. Work all of them into the CV with as few, natural edits as possible:
+    instructions: `The candidate confirmed the facts below are TRUE. Work EACH of them into the CV, where it belongs:
 - Prefer weaving a fact into an existing related bullet or paragraph (rewrite_block, keep everything else in it, including numbers); otherwise add a bullet to the most relevant entry (insert_block); tools/skills without a story go into the most relevant skills list or entry tags (set_tags: that entry's current tags plus the new ones).
-- Several facts can share one edit. Never edit the same block twice: if two facts belong in one bullet, write that bullet once.
-- Use the job's exact wording for the keywords. Each confirmed fact counts as backed by the CV: newClaims stays [] unless you add something beyond the facts and the CV.
-- Every fact must appear somewhere in your edits.
+- Spread the facts: each fact gets its own edit in the entry where it happened. Put at most two facts into one block, and only if they clearly belong together. Never edit the same block twice.
+- "facts" lists the numbers of the facts each edit works in. Every fact number must appear in at least one edit.
+- The user's own words are authoritative: when a fact has a "User's detail", use exactly what the detail confirms. If the detail is narrower than the question (e.g. names only some teams or tools), use only what the detail names, never the rest of the question.
+- Use the job's exact wording for keywords the user confirmed. Confirmed facts count as backed by the CV: newClaims stays [] unless you add something beyond the facts and the CV.
 
 ${TAILOR_RULES(language)}
 
-SCOPE (overrides the suggestion count above): make ONLY the edits needed to work in the confirmed facts, at most ${facts.length * 2} in total (aim for one per fact). These edits are applied without review, so do not touch anything unrelated to the facts: no general polishing, no summary or headline rewrite unless a fact belongs there.`,
+SCOPE (overrides the suggestion count above): make ONLY the edits needed to work in the confirmed facts, at most ${facts.length * 2} in total. These edits are applied without review, so do not touch anything unrelated to the facts: no general polishing, no summary or headline rewrite unless a fact belongs there.`,
     input: `JOB\n${describeAnalysis(analysis)}\n\nCONFIRMED FACTS (true)\n${facts.map((f, i) => `${i + 1}. ${f.statement} (covers: ${f.label}${f.requirementId ? `, ${f.requirementId}` : ""})`).join("\n")}\n\nCV\n${cv.text}`,
   });
+  return out.suggestions;
+}
+
+export async function boostSuggestions(data: ProfileData, analysis: JobAnalysis, language: Language, facts: BoostFact[]): Promise<Suggestion[]> {
+  const cv = cvForModel(data);
   const confirmed = facts.map((f) => f.statement).join("\n");
-  return out.suggestions
-    .map((m) => toSuggestion(m, cv.resolve))
-    .filter((s): s is Suggestion => s !== null)
-    .map((s) => ({ ...s, confirmedFacts: confirmed, status: "accepted" as const }))
-    // Hard cap in case the model over-edits: these are accepted without review.
-    .slice(0, facts.length * 2);
+  const toAccepted = (m: z.infer<typeof BoostSuggestion>): Suggestion | null => {
+    const s = toSuggestion(m, cv.resolve);
+    return s ? { ...s, confirmedFacts: confirmed, status: "accepted" } : null;
+  };
+
+  const first = (await boostPass(cv, analysis, language, facts)).map((m) => ({ m, s: toAccepted(m) }));
+  const result = first.map((x) => x.s).filter((s): s is Suggestion => s !== null);
+  const usedBlocks = new Set(result.map((s) => s.blockId).filter(Boolean));
+
+  // Facts the model skipped (or whose edit was invalid) get one targeted second pass.
+  const coveredFacts = new Set(first.filter((x) => x.s).flatMap((x) => x.m.facts));
+  const missing = facts.filter((_, i) => !coveredFacts.has(i + 1));
+  if (missing.length) {
+    console.log(`Quick boost: second pass for ${missing.length} uncovered fact(s)`);
+    const second = await boostPass(cv, analysis, language, missing);
+    for (const m of second) {
+      const s = toAccepted(m);
+      // Don't overwrite a block the first pass already rewrote.
+      if (s && !(s.blockId && usedBlocks.has(s.blockId))) result.push(s);
+    }
+  }
+  // Hard cap in case the model over-edits: these are accepted without review.
+  return result.slice(0, facts.length * 2);
 }
