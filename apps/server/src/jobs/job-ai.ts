@@ -235,3 +235,19 @@ ${TAILOR_RULES(language)}`,
   const next = toSuggestion(out, cv.resolve);
   return next && { ...next, id: original.id };
 }
+
+// --- 5. Cover letter ----------------------------------------------------------------------
+
+export async function writeCoverLetter(data: ProfileData, analysis: JobAnalysis, language: Language, instructions: string): Promise<string> {
+  const out = await generateJson(z.object({ text: z.string() }), {
+    name: "cover_letter",
+    instructions: `You write a concise, specific cover letter for this job, in ${languageName(language)}.
+- Use ONLY facts from the CV. Never invent achievements, numbers, tools, motivations or company knowledge beyond what the job ad says.
+- 230–330 words, 3–4 short paragraphs: why this role, 2–3 most relevant achievements tied to the main requirements, closing with availability for an interview.
+- Natural, confident tone; no clichés ("I am writing to apply", "team player", "passionate"), no keyword stuffing.
+- Start with the salutation (${language === "de" ? '"Sehr geehrte Damen und Herren," unless a contact person is named' : '"Dear Hiring Team," unless a contact person is named'}) and end with the sign-off and the candidate's name. No address block or date: those are added separately.
+- Separate paragraphs with a blank line. Return {"text": "..."}.${instructions.trim() ? `\n\nThe user's preferences (follow them):\n${instructions.trim()}` : ""}`,
+    input: `JOB\n${describeAnalysis(analysis)}\n\nCV\n${cvForModel(data).text}`,
+  });
+  return out.text.trim();
+}

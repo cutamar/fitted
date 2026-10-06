@@ -12,6 +12,7 @@ import {
   type RequirementStatus,
   type Suggestion,
 } from "@rb/shared";
+import { CoverLetterTab, StatusBadge, TrackingCard } from "../components/Application";
 import { CvPreview } from "../components/CvPreview";
 import { ExportPanel } from "../components/ExportPanel";
 import { ScorePanel } from "../components/ScorePanel";
@@ -19,7 +20,7 @@ import { SuggestionCard } from "../components/SuggestionCard";
 import { Badge, Button, Card, Notice, Spinner, cx } from "../components/ui";
 import { useDeleteJob, useJob, useJobActions } from "../lib/api";
 
-type Tab = "suggestions" | "requirements" | "keywords" | "ad";
+type Tab = "suggestions" | "letter" | "requirements" | "keywords" | "ad";
 
 export function JobPage() {
   const { id = "" } = useParams();
@@ -42,7 +43,7 @@ export function JobPage() {
           <h1 className="truncate text-2xl font-semibold tracking-tight">{job.analysis?.title || "New application"}</h1>
           <div className="text-sm text-muted">
             {job.analysis?.company && `${job.analysis.company} · `}Tailored from <span className="font-medium text-fg">{job.profileName}</span>{" "}
-            <Badge>{job.language}</Badge>
+            <Badge>{job.language}</Badge> <StatusBadge status={job.appStatus} />
           </div>
         </div>
         <Button
@@ -144,6 +145,7 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
 
   const tabs: { id: Tab; label: string }[] = [
     { id: "suggestions", label: `Suggestions (${pending.length} open)` },
+    { id: "letter", label: "Cover letter" },
     { id: "requirements", label: "Requirements" },
     { id: "keywords", label: "Keywords" },
     { id: "ad", label: "Job ad" },
@@ -218,6 +220,7 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
           </>
         )}
 
+        {tab === "letter" && <CoverLetterTab job={job} />}
         {tab === "requirements" && <RequirementsTab job={job} analysis={analysis} />}
         {tab === "keywords" && <KeywordsTab matched={currentScore.keywords.matched.map((k) => k.term)} missing={currentScore.keywords.missing.map((k) => k.term)} analysis={analysis} />}
         {tab === "ad" && (
@@ -228,6 +231,7 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
       </div>
 
       <div className="flex flex-col gap-4 xl:sticky xl:top-8 xl:max-h-[calc(100dvh-4rem)] xl:overflow-y-auto xl:pb-4">
+        <TrackingCard job={job} />
         <ScorePanel base={baseScore} current={currentScore} fitStale={fitStale} assessing={actions.assess.isPending} onAssess={() => actions.assess.mutate()} />
         <ExportPanel
           kind="job"

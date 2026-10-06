@@ -3,7 +3,8 @@ import { HttpError } from "../errors.ts";
 import { checkExport } from "../export/check.ts";
 import { renderDocx } from "../export/docx.ts";
 import { renderPdf } from "../export/pdf.ts";
-import { resolveCv, type ExportKind } from "../export/source.ts";
+import { renderLetterDocx } from "../export/letter.ts";
+import { resolveCv, resolveLetter, type ExportKind } from "../export/source.ts";
 
 const MIME = {
   pdf: "application/pdf",
@@ -11,17 +12,28 @@ const MIME = {
 } as const;
 
 function kindOf(kind: string): ExportKind {
-  if (kind !== "profile" && kind !== "job") throw new HttpError(400, `Unknown export kind "${kind}"`);
+  if (kind !== "profile" && kind !== "job" && kind !== "sent") throw new HttpError(400, `Unknown export kind "${kind}"`);
   return kind;
 }
 
 async function render(format: "pdf" | "docx", kind: ExportKind, id: string) {
   const cv = resolveCv(kind, id);
-  const bytes = format === "pdf" ? await renderPdf(kind, id) : await renderDocx(cv.data, cv.language);
+  const bytes = format === "pdf" ? await renderPdf(`/print/${kind}/${id}`) : await renderDocx(cv.data, cv.language);
   return { cv, bytes };
 }
 
 export const exportRoutes = new Hono()
+  /** Cover letter: ?sent=1 for the version frozen when applying. */
+  .get("/letter/:id/data", (c) => c.json(resolveLetter(c.req.param("id"), c.req.query("sent") === "1")))
+  .get("/letter/:id/letter.pdf", async (c) => {
+    const sent = c.req.query("sent") === "1";
+    const letter = resolveLetter(c.req.param("id"), sent);
+    return file(await renderPdf(`/print/letter/${c.req.param("id")}${sent ? "?sent=1" : ""}`), "pdf", letter.fileBase);
+  })
+  .get("/letter/:id/letter.docx", async (c) => {
+    const letter = resolveLetter(c.req.param("id"), c.req.query("sent") === "1");
+    return file(await renderLetterDocx(letter), "docx", letter.fileBase);
+  })
   /** CV data for the /print page that Chromium turns into the PDF. */
   .get("/:kind/:id/data", (c) => {
     const cv = resolveCv(kindOf(c.req.param("kind")), c.req.param("id"));
@@ -42,10 +54,14 @@ export const exportRoutes = new Hono()
 
 async function download(kind: string, id: string, format: "pdf" | "docx"): Promise<Response> {
   const { cv, bytes } = await render(format, kindOf(kind), id);
+  return file(bytes, format, cv.fileBase);
+}
+
+function file(bytes: Uint8Array, format: "pdf" | "docx", fileBase: string): Response {
   return new Response(bytes as Uint8Array<ArrayBuffer>, {
     headers: {
       "Content-Type": MIME[format],
-      "Content-Disposition": `attachment; filename="${cv.fileBase}.${format}"`,
+      "Content-Disposition": `attachment; filename="${fileBase}.${format}"`,
       "Cache-Control": "no-store",
     },
   });

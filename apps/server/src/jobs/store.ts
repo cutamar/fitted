@@ -15,6 +15,11 @@ interface JobRow {
   base: string | null;
   assessment: string | null;
   suggestions: string;
+  app_status: string;
+  history: string;
+  notes: string;
+  cover_letter: string | null;
+  sent: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -36,6 +41,11 @@ function fromRow(r: JobRow): Job {
     base: parse(r.base),
     assessment: parse(r.assessment),
     suggestions: JSON.parse(r.suggestions),
+    appStatus: r.app_status,
+    history: JSON.parse(r.history),
+    notes: r.notes,
+    coverLetter: parse(r.cover_letter),
+    sent: parse(r.sent),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   });
@@ -82,9 +92,18 @@ const COLUMNS: Record<string, string> = {
   base: "base",
   assessment: "assessment",
   suggestions: "suggestions",
+  appStatus: "app_status",
+  history: "history",
+  notes: "notes",
+  coverLetter: "cover_letter",
+  sent: "sent",
 };
 
-export function updateJob(id: string, patch: Partial<Pick<Job, "instructions" | "status" | "step" | "error" | "analysis" | "base" | "assessment" | "suggestions">>): Job | null {
+type JobPatch = Partial<
+  Pick<Job, "instructions" | "status" | "step" | "error" | "analysis" | "base" | "assessment" | "suggestions" | "appStatus" | "history" | "notes" | "coverLetter" | "sent">
+>;
+
+export function updateJob(id: string, patch: JobPatch): Job | null {
   const entries = Object.entries(patch).filter(([k]) => k in COLUMNS);
   if (entries.length) {
     const sets = entries.map(([k]) => `${COLUMNS[k]} = ?`).join(", ");

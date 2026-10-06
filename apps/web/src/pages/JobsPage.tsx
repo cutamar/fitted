@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Briefcase, Plus, Sparkles } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { computeScore, type Job } from "@rb/shared";
+import { StatusBadge } from "../components/Application";
 import { ScoreRing } from "../components/ScorePanel";
 import { Badge, Button, Card, Field, Notice, PageHeader, Select, Spinner, Textarea, cx } from "../components/ui";
 import { loginUrl, useAuthStatus, useCreateJob, useJobs, useProfiles } from "../lib/api";
@@ -54,6 +55,7 @@ function JobRow({ job }: { job: Job }) {
             {job.analysis?.company || "Company unknown"} · Profile: {job.profileName}
           </div>
         </div>
+        <StatusBadge status={job.appStatus} />
         <div className="hidden text-right text-xs text-muted sm:block">
           {job.status === "analyzing" && <span className="text-accent">{job.step}…</span>}
           {job.status === "error" && <span className="text-danger">Analysis failed</span>}

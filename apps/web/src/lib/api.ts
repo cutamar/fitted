@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AuthStatus, ChatGPTModel, CreateJob, ImportRecord, Job, Profile, ProfileInput, SuggestionStatus } from "@rb/shared";
+import type { AppStatus, AuthStatus, ChatGPTModel, CreateJob, ImportRecord, Job, Profile, ProfileInput, SuggestionStatus } from "@rb/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -192,13 +192,16 @@ export function useJobActions(id: string) {
       request<Job>(`/jobs/${id}/suggestions/${sid}/regenerate`, json("POST", { instruction })),
     ),
     assess: useJobMutation(id, () => request<Job>(`/jobs/${id}/assess`, json("POST"))),
+    tracking: useJobMutation(id, (v: { appStatus?: AppStatus; notes?: string }) => request<Job>(`/jobs/${id}/tracking`, json("PATCH", v))),
+    writeLetter: useJobMutation(id, (instructions: string) => request<Job>(`/jobs/${id}/cover-letter`, json("POST", { instructions }))),
+    saveLetter: useJobMutation(id, (text: string) => request<Job>(`/jobs/${id}/cover-letter`, json("PUT", { text }))),
     reanalyze: useJobMutation(id, (v: { refreshProfile: boolean; instructions?: string }) => request<Job>(`/jobs/${id}/analyze`, json("POST", v))),
   };
 }
 
 // --- Export ------------------------------------------------------------------
 
-export type ExportKind = "profile" | "job";
+export type ExportKind = "profile" | "job" | "sent";
 
 export interface AtsReport {
   format: "pdf" | "docx";
@@ -215,4 +218,16 @@ export const exportUrl = (kind: ExportKind, id: string, format: "pdf" | "docx") 
 
 export function useAtsCheck(kind: ExportKind, id: string) {
   return useMutation({ mutationFn: () => request<AtsReport[]>(`/export/${kind}/${id}/check`) });
+}
+
+export const letterUrl = (jobId: string, format: "pdf" | "docx", sent = false) => `/api/export/letter/${jobId}/letter.${format}${sent ? "?sent=1" : ""}`;
+
+/** Downloads via fetch so server errors (e.g. missing Chromium) surface as messages. */
+export async function downloadFile(url: string): Promise<void> {
+  const res = await fetch(url);
+  if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `Export failed (${res.status})`);
+  const name = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] ?? url.split("/").pop()!;
+  const href = URL.createObjectURL(await res.blob());
+  Object.assign(document.createElement("a"), { href, download: name }).click();
+  URL.revokeObjectURL(href);
 }

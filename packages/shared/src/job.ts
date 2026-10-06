@@ -97,6 +97,24 @@ export const SuggestionSchema = z.object({
 });
 export type Suggestion = z.infer<typeof SuggestionSchema>;
 
+export const APP_STATUSES = ["draft", "applied", "interview", "offer", "rejected"] as const;
+export const AppStatusSchema = z.enum(APP_STATUSES);
+export type AppStatus = z.infer<typeof AppStatusSchema>;
+
+export const CoverLetterSchema = z.object({
+  text: z.string(),
+  generatedAt: z.string(),
+});
+export type CoverLetter = z.infer<typeof CoverLetterSchema>;
+
+/** What was actually sent: frozen when the application is marked as applied. */
+export const SentSnapshotSchema = z.object({
+  data: ProfileDataSchema,
+  coverLetter: z.string().nullable(),
+  at: z.string(),
+});
+export type SentSnapshot = z.infer<typeof SentSnapshotSchema>;
+
 export const JobStatusSchema = z.enum(["analyzing", "ready", "error"]);
 export type JobStatus = z.infer<typeof JobStatusSchema>;
 
@@ -118,6 +136,12 @@ export const JobSchema = z.object({
   base: ProfileDataSchema.nullable(),
   assessment: AssessmentSchema.nullable(),
   suggestions: z.array(SuggestionSchema),
+  appStatus: AppStatusSchema.default("draft"),
+  /** Status changes, oldest first. */
+  history: z.array(z.object({ status: AppStatusSchema, at: z.string() })).default([]),
+  notes: z.string().default(""),
+  coverLetter: CoverLetterSchema.nullable().default(null),
+  sent: SentSnapshotSchema.nullable().default(null),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

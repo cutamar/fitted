@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { AlertTriangle, CheckCircle2, ChevronDown, ChevronRight, FileDown, ScanSearch } from "lucide-react";
-import { exportUrl, useAtsCheck, type AtsReport, type ExportKind } from "../lib/api";
+import { downloadFile, exportUrl, useAtsCheck, type AtsReport, type ExportKind } from "../lib/api";
 import { Button, Card, Notice, Spinner, cx } from "./ui";
 
 interface Props {
@@ -22,13 +22,7 @@ export function ExportPanel({ kind, id, blockedReason, version }: Props) {
     // Fetch instead of a plain link so errors (e.g. missing Chromium) are visible.
     setDownloading(format);
     try {
-      const res = await fetch(exportUrl(kind, id, format));
-      if (!res.ok) throw new Error((await res.json().catch(() => null))?.error ?? `Export failed (${res.status})`);
-      const name = res.headers.get("Content-Disposition")?.match(/filename="(.+)"/)?.[1] ?? `CV.${format}`;
-      const url = URL.createObjectURL(await res.blob());
-      const a = Object.assign(document.createElement("a"), { href: url, download: name });
-      a.click();
-      URL.revokeObjectURL(url);
+      await downloadFile(exportUrl(kind, id, format));
     } catch (err) {
       alert((err as Error).message);
     } finally {

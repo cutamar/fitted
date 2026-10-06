@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { CreateJobSchema, SuggestionStatusSchema, acceptedKey, applySuggestions, newId, type Job } from "@rb/shared";
-import { assess, analyzeJob, assessAndSuggest, regenerateSuggestion } from "../jobs/job-ai.ts";
+import { AppStatusSchema, CreateJobSchema, SuggestionStatusSchema, acceptedKey, applySuggestions, tailoredData, newId, type Job } from "@rb/shared";
+import { assess, analyzeJob, assessAndSuggest, regenerateSuggestion, writeCoverLetter } from "../jobs/job-ai.ts";
 import { deleteJob, failInterruptedJobs, getJob, insertJob, listJobs, updateJob } from "../jobs/store.ts";
 import { HttpError } from "../errors.ts";
 import { getProfile } from "./profiles.ts";
@@ -58,6 +58,11 @@ export const jobRoutes = new Hono()
       base: profile.data,
       assessment: null,
       suggestions: [],
+      appStatus: "draft",
+      history: [],
+      notes: "",
+      coverLetter: null,
+      sent: null,
       createdAt: now,
       updatedAt: now,
     };
@@ -120,6 +125,33 @@ export const jobRoutes = new Hono()
     const { ids, status } = z.object({ ids: z.array(z.string()), status: SuggestionStatusSchema }).parse(await c.req.json());
     const set = new Set(ids);
     return c.json(updateJob(job.id, { suggestions: job.suggestions.map((s) => (set.has(s.id) ? { ...s, status } : s)) }));
+  })
+  /** Tracking: status and notes. Marking as applied freezes what was sent. */
+  .patch("/:id/tracking", async (c) => {
+    const job = requireJob(c.req.param("id"));
+    const body = z.object({ appStatus: AppStatusSchema.optional(), notes: z.string().optional() }).parse(await c.req.json());
+    const patch: Parameters<typeof updateJob>[1] = {};
+    if (body.notes !== undefined) patch.notes = body.notes;
+    if (body.appStatus && body.appStatus !== job.appStatus) {
+      patch.appStatus = body.appStatus;
+      patch.history = [...job.history, { status: body.appStatus, at: new Date().toISOString() }];
+      if (body.appStatus === "applied" && job.base) {
+        patch.sent = { data: tailoredData(job.base, job.suggestions), coverLetter: job.coverLetter?.text ?? null, at: new Date().toISOString() };
+      }
+    }
+    return c.json(updateJob(job.id, patch));
+  })
+  .post("/:id/cover-letter", async (c) => {
+    const job = requireJob(c.req.param("id"));
+    if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
+    const { instructions } = z.object({ instructions: z.string().default("") }).parse(await c.req.json().catch(() => ({})));
+    const text = await writeCoverLetter(tailoredData(job.base, job.suggestions), job.analysis, job.language, instructions);
+    return c.json(updateJob(job.id, { coverLetter: { text, generatedAt: new Date().toISOString() } }));
+  })
+  .put("/:id/cover-letter", async (c) => {
+    const job = requireJob(c.req.param("id"));
+    const { text } = z.object({ text: z.string() }).parse(await c.req.json());
+    return c.json(updateJob(job.id, { coverLetter: { text, generatedAt: job.coverLetter?.generatedAt ?? new Date().toISOString() } }));
   })
   .post("/:id/suggestions/:sid/regenerate", async (c) => {
     const job = requireJob(c.req.param("id"));

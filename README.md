@@ -24,8 +24,13 @@ Runs only on your machine. Your CVs live in a local SQLite database.
 - Export the master profile or a job's tailored CV (accepted suggestions only); file names like `Name_CV_Company.pdf`
 - ATS readability check: re-extracts text from both files like a parser does and verifies every heading, job, date, bullet and skill made it, in order; shows "what an ATS sees"
 
+**Applications**
+- Status per job (draft → applied → interview → offer / rejected) with dated history and notes
+- Marking as applied freezes the exact CV and cover letter sent; download them any time later
+- Cover letters from the tailored CV and job ad, in the profile's language, facts from the CV only; edit, rewrite with instructions, export as PDF or Word
+
 **Next**
-- Application tracking, cover letters
+- Learned style preferences
 
 ## Run (Docker)
 

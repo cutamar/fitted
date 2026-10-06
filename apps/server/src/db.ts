@@ -47,6 +47,11 @@ const migrations: string[] = [
      created_at TEXT NOT NULL,
      updated_at TEXT NOT NULL
    );`,
+  `ALTER TABLE jobs ADD COLUMN app_status TEXT NOT NULL DEFAULT 'draft';
+   ALTER TABLE jobs ADD COLUMN history TEXT NOT NULL DEFAULT '[]';
+   ALTER TABLE jobs ADD COLUMN notes TEXT NOT NULL DEFAULT '';
+   ALTER TABLE jobs ADD COLUMN cover_letter TEXT;
+   ALTER TABLE jobs ADD COLUMN sent TEXT;`,
 ];
 
 const { user_version: current } = db.prepare("PRAGMA user_version").get() as { user_version: number };

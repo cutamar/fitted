@@ -5,7 +5,6 @@
 import fs from "node:fs";
 import { chromium, type Browser } from "playwright-core";
 import { config } from "../config.ts";
-import type { ExportKind } from "./source.ts";
 
 const CANDIDATES = [process.env.CHROMIUM_PATH, "/usr/bin/chromium", "/usr/bin/chromium-browser", "/usr/bin/google-chrome", "/opt/pw-browsers/chromium"];
 
@@ -39,10 +38,11 @@ async function getBrowser(): Promise<Browser> {
   return browser;
 }
 
-export async function renderPdf(kind: ExportKind, id: string): Promise<Uint8Array> {
+/** `printPath` is a web route such as /print/job/<id> that sets body[data-print-ready]. */
+export async function renderPdf(printPath: string): Promise<Uint8Array> {
   const page = await (await getBrowser()).newPage();
   try {
-    await page.goto(`${printOrigin()}/print/${kind}/${id}`, { waitUntil: "networkidle" });
+    await page.goto(`${printOrigin()}${printPath}`, { waitUntil: "networkidle" });
     await page.waitForSelector("body[data-print-ready]", { timeout: 15_000 });
     const error = await page.getAttribute("body", "data-print-error");
     if (error) throw new Error(error);
