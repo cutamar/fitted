@@ -90,6 +90,8 @@ export const SuggestionSchema = z.object({
   requirementIds: z.array(z.string()).default([]),
   /** Facts the model says are not backed by the profile. */
   newClaims: z.array(z.string()).default([]),
+  /** What the user stated as true when asking for this ("Add to CV"); not flagged as unsupported. */
+  confirmedFacts: z.string().default(""),
   status: SuggestionStatusSchema.default("pending"),
   /** User's own version of `text` / `tags`, applied instead of the proposal. */
   editedText: z.string().nullable().default(null),

@@ -231,3 +231,19 @@ export async function downloadFile(url: string): Promise<void> {
   Object.assign(document.createElement("a"), { href, download: name }).click();
   URL.revokeObjectURL(href);
 }
+
+export interface AddToCvInput {
+  requirementId?: string;
+  keyword?: string;
+  details: string;
+  itemId?: string;
+}
+
+/** Creates one suggestion that covers a requirement or keyword. */
+export function useAddToCv(jobId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: AddToCvInput) => request<{ job: Job; suggestionId: string }>(`/jobs/${jobId}/suggestions/add`, json("POST", v)),
+    onSuccess: ({ job }) => qc.setQueryData(["jobs", jobId], job),
+  });
+}

@@ -73,10 +73,12 @@ export function applySuggestions(
       case "rewrite_summary":
         changes.summary ??= data.basics.summary;
         data.basics.summary = suggestionText(s);
+        changes.sources.summary = s.id;
         break;
       case "rewrite_headline":
         changes.headline ??= data.basics.headline;
         data.basics.headline = suggestionText(s);
+        changes.sources.headline = s.id;
         break;
       case "rewrite_block": {
         const hit = findBlock(data, s.blockId);
@@ -296,7 +298,7 @@ export function unsupportedClaims(s: Suggestion, master: ProfileData, analysis: 
     const before = new Set(master.sections.flatMap((sec) => sec.items).find((i) => i.id === s.itemId)?.tags.map((t) => t.toLowerCase()) ?? []);
     for (const tag of suggestionTags(s)) if (!before.has(tag.toLowerCase())) warnings.push({ kind: "tag", text: tag });
   }
-  const masterText = normalizeForMatch(profileText(master));
+  const masterText = normalizeForMatch(`${profileText(master)}\n${s.confirmedFacts}`);
   const proposed = s.type === "set_tags" ? suggestionTags(s).join(", ") : s.type === "remove_block" || s.type.endsWith("_item") ? "" : suggestionText(s);
   if (!proposed) return warnings;
   const proposedNorm = normalizeForMatch(proposed);

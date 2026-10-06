@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useParams } from "react-router";
 import type { Language, ProfileData } from "@rb/shared";
-import { CvDocument } from "../components/CvPreview";
+import { CvPrint } from "../components/CvPreview";
 import { LetterDocument, type LetterData } from "../components/LetterDocument";
 
 /**
@@ -28,11 +28,16 @@ export function PrintPage() {
       });
   }, [kind, id, isLetter]);
 
+  const markReady = useCallback(() => {
+    document.body.dataset.printReady = "1";
+  }, []);
+
   useEffect(() => {
     if (!cv && !letter) return;
     document.title = cv ? `${cv.data.basics.fullName} – CV` : `${letter!.basics.fullName} – Cover letter`;
-    void document.fonts.ready.then(() => (document.body.dataset.printReady = "1"));
-  }, [cv, letter]);
+    // The CV signals readiness itself once paginated; the letter only needs fonts.
+    if (letter) void document.fonts.ready.then(markReady);
+  }, [cv, letter, markReady]);
 
   if (letter) {
     return (
@@ -45,10 +50,9 @@ export function PrintPage() {
   if (!cv) return null;
   return (
     <>
-      <style>{`@page { size: A4; margin: 13mm 15mm; } html, body { background: #fff !important; }`}</style>
-      <div className="text-[#1d1d24]">
-        <CvDocument data={cv.data} language={cv.language} print />
-      </div>
+      {/* Pages are explicit A4 sheets with their own margins (see CvPrint). */}
+      <style>{`@page { size: A4; margin: 0; } html, body { background: #fff !important; margin: 0; }`}</style>
+      <CvPrint data={cv.data} language={cv.language} onReady={markReady} />
     </>
   );
 }

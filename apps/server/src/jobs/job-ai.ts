@@ -251,3 +251,39 @@ export async function writeCoverLetter(data: ProfileData, analysis: JobAnalysis,
   });
   return out.text.trim();
 }
+
+// --- 6. Covering one requirement / keyword on request -----------------------------------
+
+export interface GapTarget {
+  /** What to cover: a requirement text or a keyword. */
+  label: string;
+  kind: "requirement" | "keyword";
+  requirementId?: string;
+  /** What the user says is true about it; empty = only what the CV already supports. */
+  details: string;
+  /** Entry the user wants it in; empty = model picks. */
+  itemId?: string;
+}
+
+export async function suggestForGap(data: ProfileData, analysis: JobAnalysis, language: Language, target: GapTarget): Promise<Suggestion | null> {
+  const cv = cvForModel(data);
+  const where = target.itemId ? cv.shortIdOf(target.itemId) : "";
+  const out = await generateJson(ModelSuggestion, {
+    name: "cv_gap_suggestion",
+    instructions: `The user wants their CV to cover one ${target.kind} of the job. Propose exactly ONE suggestion that adds it in the most natural place.
+
+How to choose:
+- If an existing bullet or paragraph is about related work, prefer rewrite_block that weaves it in (keep everything else in that block, including numbers).
+- Otherwise insert_block: a new bullet in the most relevant entry, placed after the most related block (afterBlockId), or "" for the start.
+- For a pure tool/skill keyword with no story to tell, set_tags on the most relevant entry or skills group: the entry's existing tags in their order, plus the keyword placed by relevance.
+${where ? `- The user wants it in entry [${where}]. Use that entry (or one of its blocks).` : ""}
+- Facts: use the CV and the user's statement below. The user's statement is confirmed true: do not list it in newClaims. Anything beyond both goes into newClaims.
+- Use the job's exact wording for the ${target.kind} where it fits naturally.
+
+${TAILOR_RULES(language)}`,
+    input: `JOB\n${describeAnalysis(analysis)}\n\nCOVER THIS ${target.kind.toUpperCase()}\n${target.label}\n\nUSER'S STATEMENT (true)\n${target.details.trim() || "(none: only use what the CV already supports)"}\n\nCV\n${cv.text}`,
+  });
+  const s = toSuggestion(out, cv.resolve);
+  if (!s) return null;
+  return { ...s, confirmedFacts: target.details.trim(), requirementIds: target.requirementId ? [...new Set([target.requirementId, ...s.requirementIds])] : s.requirementIds };
+}

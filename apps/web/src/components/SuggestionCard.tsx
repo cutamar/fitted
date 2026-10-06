@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { AlertTriangle, ArrowDownUp, Check, EyeOff, Eye, FileText, Heading, List, Pencil, Plus, Tags, Trash2, Undo2, Wand2, X } from "lucide-react";
+import { AlertTriangle, LocateFixed, ArrowDownUp, Check, EyeOff, Eye, FileText, Heading, List, Pencil, Plus, Tags, Trash2, Undo2, Wand2, X } from "lucide-react";
 import {
   suggestionTags,
   suggestionText,
@@ -28,12 +28,16 @@ const TYPE_META: Record<SuggestionType, { label: string; icon: typeof Plus }> = 
 };
 
 function locate(base: ProfileData, s: Suggestion): { item: Item | null; block: Block | null; sectionTitle: string } {
+  // Block first: block suggestions may also carry their entry's itemId.
   for (const section of base.sections) {
     for (const item of section.items) {
-      if (item.id === s.itemId) return { item, block: null, sectionTitle: section.title };
-      const block = item.content.find((b) => b.id === s.blockId);
+      const block = s.blockId ? item.content.find((b) => b.id === s.blockId) : undefined;
       if (block) return { item, block, sectionTitle: section.title };
     }
+  }
+  for (const section of base.sections) {
+    const item = section.items.find((i) => i.id === s.itemId);
+    if (item) return { item, block: null, sectionTitle: section.title };
   }
   return { item: null, block: null, sectionTitle: "" };
 }
@@ -54,9 +58,12 @@ interface Props {
   regenerating: boolean;
   onPatch: (patch: SuggestionPatch) => void;
   onRegenerate: (instruction: string) => void;
+  /** "Show in CV" target: outlined here and in the preview. */
+  focused: boolean;
+  onFocus: () => void;
 }
 
-export function SuggestionCard({ suggestion: s, base, analysis, warnings, delta, regenerating, onPatch, onRegenerate }: Props) {
+export function SuggestionCard({ suggestion: s, base, analysis, warnings, delta, regenerating, onPatch, onRegenerate, focused, onFocus }: Props) {
   const [mode, setMode] = useState<"view" | "edit" | "regenerate">("view");
   const [draft, setDraft] = useState("");
   const [instruction, setInstruction] = useState("");
@@ -97,7 +104,13 @@ export function SuggestionCard({ suggestion: s, base, analysis, warnings, delta,
   const label = s.type === "rewrite_block" || s.type === "insert_block" || s.type === "remove_block" ? `${meta.label} ${block?.type === "text" || s.blockType === "text" ? "paragraph" : "bullet"}` : meta.label;
 
   return (
-    <div className={cx("rounded-xl border bg-surface shadow-(--shadow-card) transition", accepted ? "border-success/50 ring-1 ring-success/20" : "border-border")}>
+    <div
+      id={`sug-${s.id}`}
+      className={cx(
+        "scroll-mt-24 rounded-xl border bg-surface shadow-(--shadow-card) transition",
+        focused ? "border-accent ring-2 ring-accent/30" : accepted ? "border-success/50 ring-1 ring-success/20" : "border-border",
+      )}
+    >
       <div className="flex flex-wrap items-center gap-2 px-4 pt-3.5">
         <span className={cx("flex size-7 items-center justify-center rounded-lg [&_svg]:size-3.5", accepted ? "bg-success/15 text-success" : "bg-accent-soft text-accent-soft-fg")}>
           {accepted ? <Check /> : <Icon />}
@@ -229,6 +242,9 @@ export function SuggestionCard({ suggestion: s, base, analysis, warnings, delta,
             </>
           )}
           <span className="ml-auto flex gap-1">
+            <Button size="sm" variant={focused ? "soft" : "ghost"} onClick={onFocus} title="Highlight where this goes in the CV preview">
+              <LocateFixed /> {focused ? "Shown in CV" : "Show in CV"}
+            </Button>
             {editable && (
               <Button size="sm" variant="ghost" onClick={startEdit}>
                 <Pencil /> Edit

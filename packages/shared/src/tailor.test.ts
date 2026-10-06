@@ -118,3 +118,10 @@ describe("unsupportedClaims for tags", () => {
     expect(unsupportedClaims(s, base, analysis)).toEqual([{ kind: "tag", text: "Engineer" }]);
   });
 });
+
+describe("unsupportedClaims with user-confirmed facts", () => {
+  it("doesn't flag what the user stated as true", () => {
+    const s = sug({ type: "insert_block", itemId: item.id, text: "Ran Kubernetes clusters for 40 teams.", confirmedFacts: "I ran Kubernetes clusters for 40 teams" });
+    expect(unsupportedClaims(s, base, analysis)).toEqual([]);
+  });
+});

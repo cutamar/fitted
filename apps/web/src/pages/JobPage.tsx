@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, CheckCheck, Languages, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Languages, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import {
   acceptedKey,
@@ -13,6 +13,7 @@ import {
   type Suggestion,
 } from "@rb/shared";
 import { CoverLetterTab, StatusBadge, TrackingCard } from "../components/Application";
+import { AddToCvForm } from "../components/AddToCv";
 import { CvPreview } from "../components/CvPreview";
 import { ExportPanel } from "../components/ExportPanel";
 import { ScorePanel } from "../components/ScorePanel";
@@ -112,6 +113,15 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
   const [highlight, setHighlight] = useState(true);
   const [includePending, setIncludePending] = useState(false);
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  /** Suggestion shown in the preview ("Show in CV"), even before it's accepted. */
+  const [focusId, setFocusId] = useState<string | null>(null);
+
+  /** After "Add to CV": jump to the new card and show where it lands. */
+  const showNew = (sid: string) => {
+    setTab("suggestions");
+    setFocusId(sid);
+    setTimeout(() => document.getElementById(`sug-${sid}`)?.scrollIntoView({ behavior: "smooth", block: "center" }), 100);
+  };
 
   const accepted = job.suggestions.filter((s) => s.status === "accepted");
   const pending = job.suggestions.filter((s) => s.status === "pending");
@@ -131,8 +141,13 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
   const warnings = useMemo(() => Object.fromEntries(job.suggestions.map((s) => [s.id, unsupportedClaims(s, base, analysis)])), [job.suggestions, base, analysis]);
 
   const preview = useMemo(
-    () => applySuggestions(base, includePending ? job.suggestions.filter((s) => s.status !== "rejected") : accepted, { keepRemoved: highlight }),
-    [base, job.suggestions, accepted, includePending, highlight],
+    () =>
+      applySuggestions(
+        base,
+        job.suggestions.filter((s) => s.status === "accepted" || (s.status === "pending" && (includePending || s.id === focusId))),
+        { keepRemoved: highlight },
+      ),
+    [base, job.suggestions, includePending, highlight, focusId],
   );
 
   const languageMismatch = analysis.jobLanguage !== "other" && analysis.jobLanguage !== job.language;
@@ -215,14 +230,16 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
                 regenerating={regeneratingId === s.id}
                 onPatch={(patch) => actions.patchSuggestion.mutate({ sid: s.id, patch })}
                 onRegenerate={(instruction) => regenerate(s, instruction)}
+                focused={focusId === s.id}
+                onFocus={() => setFocusId(focusId === s.id ? null : s.id)}
               />
             ))}
           </>
         )}
 
         {tab === "letter" && <CoverLetterTab job={job} />}
-        {tab === "requirements" && <RequirementsTab job={job} analysis={analysis} />}
-        {tab === "keywords" && <KeywordsTab matched={currentScore.keywords.matched.map((k) => k.term)} missing={currentScore.keywords.missing.map((k) => k.term)} analysis={analysis} />}
+        {tab === "requirements" && <RequirementsTab job={job} analysis={analysis} onAdded={showNew} />}
+        {tab === "keywords" && <KeywordsTab job={job} onAdded={showNew} matched={currentScore.keywords.matched.map((k) => k.term)} missing={currentScore.keywords.missing.map((k) => k.term)} analysis={analysis} />}
         {tab === "ad" && (
           <Card className="p-5">
             <pre className="font-sans text-sm leading-relaxed whitespace-pre-wrap">{job.description}</pre>
@@ -251,7 +268,7 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
               Include open suggestions
             </label>
           </div>
-          <CvPreview data={preview.data} language={job.language} changes={highlight ? preview.changes : null} />
+          <CvPreview data={preview.data} language={job.language} changes={highlight || focusId ? preview.changes : null} focusSuggestion={focusId} />
         </div>
       </div>
     </div>
@@ -264,7 +281,8 @@ const STATUS_STYLE: Record<RequirementStatus, { label: string; className: string
   missing: { label: "Missing", className: "bg-danger/10 text-danger", icon: X },
 };
 
-function RequirementsTab({ job, analysis }: { job: Job; analysis: JobAnalysis }) {
+function RequirementsTab({ job, analysis, onAdded }: { job: Job; analysis: JobAnalysis; onAdded: (sid: string) => void }) {
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <div className="flex flex-col gap-3">
       {job.assessment && (
@@ -276,16 +294,25 @@ function RequirementsTab({ job, analysis }: { job: Job; analysis: JobAnalysis })
       <Card className="divide-y divide-border">
         {analysis.requirements.map((r) => {
           const a = job.assessment?.requirements.find((x) => x.id === r.id);
-          const st = STATUS_STYLE[a?.status ?? "missing"];
+          const status = a?.status ?? "missing";
+          const st = STATUS_STYLE[status];
           return (
-            <div key={r.id} className="flex gap-3 p-4">
-              <span className={cx("h-fit shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold", st.className)}>{st.label}</span>
-              <div className="min-w-0">
-                <div className="text-sm font-medium">
-                  {r.text} {!r.mustHave && <span className="text-xs font-normal text-muted">· nice to have</span>}
+            <div key={r.id} className="p-4">
+              <div className="flex gap-3">
+                <span className={cx("h-fit shrink-0 rounded-md px-2 py-0.5 text-xs font-semibold", st.className)}>{st.label}</span>
+                <div className="min-w-0 flex-1">
+                  <div className="text-sm font-medium">
+                    {r.text} {!r.mustHave && <span className="text-xs font-normal text-muted">· nice to have</span>}
+                  </div>
+                  {a?.evidence && <p className="mt-0.5 text-xs text-muted">{a.evidence}</p>}
                 </div>
-                {a?.evidence && <p className="mt-0.5 text-xs text-muted">{a.evidence}</p>}
+                {status !== "met" && open !== r.id && (
+                  <Button size="sm" variant="soft" onClick={() => setOpen(r.id)}>
+                    <Plus /> Add to CV
+                  </Button>
+                )}
               </div>
+              {open === r.id && <AddToCvForm job={job} target={{ requirementId: r.id, label: r.text }} onAdded={onAdded} onCancel={() => setOpen(null)} />}
             </div>
           );
         })}
@@ -294,35 +321,43 @@ function RequirementsTab({ job, analysis }: { job: Job; analysis: JobAnalysis })
   );
 }
 
-function KeywordsTab({ matched, missing, analysis }: { matched: string[]; missing: string[]; analysis: JobAnalysis }) {
+function KeywordsTab({ job, matched, missing, analysis, onAdded }: { job: Job; matched: string[]; missing: string[]; analysis: JobAnalysis; onAdded: (sid: string) => void }) {
+  const [open, setOpen] = useState<string | null>(null);
   const byTerm = new Map(analysis.keywords.map((k) => [k.term, k]));
   const chip = (term: string, ok: boolean) => {
     const k = byTerm.get(term);
     return (
-      <span
+      <button
+        type="button"
         key={term}
-        title={k?.variants.length ? `Also matches: ${k.variants.join(", ")}` : undefined}
-        className={cx("inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium", ok ? "bg-success/12 text-success" : "bg-subtle text-muted")}
+        disabled={ok}
+        onClick={() => setOpen(term)}
+        title={ok ? (k?.variants.length ? `Also matches: ${k.variants.join(", ")}` : undefined) : "Add to CV"}
+        className={cx(
+          "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition",
+          ok ? "bg-success/12 text-success" : open === term ? "bg-accent text-accent-fg" : "bg-subtle text-muted hover:bg-accent-soft hover:text-accent-soft-fg",
+        )}
       >
-        {ok ? <Check className="size-3" /> : <X className="size-3" />}
+        {ok ? <Check className="size-3" /> : <Plus className="size-3" />}
         {term}
         {k?.importance === "high" && <span className="opacity-60">★</span>}
-      </span>
+      </button>
     );
   };
   return (
     <Card className="flex flex-col gap-4 p-5">
       <p className="text-xs text-muted">
-        Keywords an ATS scans for, matched against your tailored CV (with accepted suggestions). ★ = high importance. Missing keywords only belong in your CV if
-        they're true. Hover to see accepted variants.
+        Keywords an ATS scans for, matched against your tailored CV (with accepted suggestions). ★ = high importance. Click a missing keyword to add it, but only
+        if it's true.
       </p>
-      <div>
-        <div className="mb-2 text-sm font-semibold">Found ({matched.length})</div>
-        <div className="flex flex-wrap gap-1.5">{matched.map((t) => chip(t, true))}</div>
-      </div>
       <div>
         <div className="mb-2 text-sm font-semibold">Missing ({missing.length})</div>
         <div className="flex flex-wrap gap-1.5">{missing.map((t) => chip(t, false))}</div>
+        {open && <AddToCvForm key={open} job={job} target={{ keyword: open, label: open }} onAdded={onAdded} onCancel={() => setOpen(null)} />}
+      </div>
+      <div>
+        <div className="mb-2 text-sm font-semibold">Found ({matched.length})</div>
+        <div className="flex flex-wrap gap-1.5">{matched.map((t) => chip(t, true))}</div>
       </div>
     </Card>
   );

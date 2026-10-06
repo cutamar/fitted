@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
 import { AppStatusSchema, CreateJobSchema, SuggestionStatusSchema, acceptedKey, applySuggestions, tailoredData, newId, type Job } from "@rb/shared";
-import { assess, analyzeJob, assessAndSuggest, regenerateSuggestion, writeCoverLetter } from "../jobs/job-ai.ts";
+import { assess, analyzeJob, assessAndSuggest, regenerateSuggestion, suggestForGap, writeCoverLetter } from "../jobs/job-ai.ts";
 import { deleteJob, failInterruptedJobs, getJob, insertJob, listJobs, updateJob } from "../jobs/store.ts";
 import { HttpError } from "../errors.ts";
 import { getProfile } from "./profiles.ts";
@@ -152,6 +152,27 @@ export const jobRoutes = new Hono()
     const job = requireJob(c.req.param("id"));
     const { text } = z.object({ text: z.string() }).parse(await c.req.json());
     return c.json(updateJob(job.id, { coverLetter: { text, generatedAt: job.coverLetter?.generatedAt ?? new Date().toISOString() } }));
+  })
+  /** "Add to CV" for a requirement or keyword: one new suggestion, appended. */
+  .post("/:id/suggestions/add", async (c) => {
+    const job = requireJob(c.req.param("id"));
+    if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
+    const body = z
+      .object({ requirementId: z.string().optional(), keyword: z.string().optional(), details: z.string().default(""), itemId: z.string().optional() })
+      .parse(await c.req.json());
+    const req = body.requirementId ? job.analysis.requirements.find((r) => r.id === body.requirementId) : undefined;
+    const label = req?.text ?? body.keyword;
+    if (!label) return c.json({ error: "Pick a requirement or keyword." }, 400);
+    const s = await suggestForGap(job.base, job.analysis, job.language, {
+      label,
+      kind: req ? "requirement" : "keyword",
+      requirementId: req?.id,
+      details: body.details,
+      itemId: body.itemId,
+    });
+    if (!s) return c.json({ error: "ChatGPT couldn't place it. Try adding a sentence about where you used it." }, 502);
+    const fresh = requireJob(job.id);
+    return c.json({ job: updateJob(job.id, { suggestions: [...fresh.suggestions, s] }), suggestionId: s.id });
   })
   .post("/:id/suggestions/:sid/regenerate", async (c) => {
     const job = requireJob(c.req.param("id"));
