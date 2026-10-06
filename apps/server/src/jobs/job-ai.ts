@@ -287,3 +287,60 @@ ${TAILOR_RULES(language)}`,
   if (!s) return null;
   return { ...s, confirmedFacts: target.details.trim(), requirementIds: target.requirementId ? [...new Set([target.requirementId, ...s.requirementIds])] : s.requirementIds };
 }
+
+// --- 7. Quick boost: yes/no questions, then changes from the "yes" answers -----------------
+
+export interface BoostGap {
+  label: string;
+  kind: "keyword" | "requirement";
+  requirementId?: string;
+  /** Why it matters, e.g. "must-have, missing" or "high-importance keyword". */
+  weight: string;
+}
+
+export async function boostQuestions(data: ProfileData, analysis: JobAnalysis, gaps: BoostGap[]): Promise<{ question: string; gapIndex: number }[]> {
+  const out = await generateJson(z.object({ questions: z.array(z.object({ question: z.string(), gapIndex: z.number() })) }), {
+    name: "boost_questions",
+    instructions: `The candidate wants to raise their CV's match for this job quickly by answering yes/no questions. You get the CV and a numbered list of gaps (missing keywords and unmet requirements), most important first.
+
+Write one short yes/no question per gap worth asking, at most 10, most score-relevant first:
+- Ask about real experience, concretely: "Have you used Amplitude or Mixpanel for product analytics?" not "Do you know analytics?"
+- Merge gaps that one answer covers (e.g. a keyword that is part of a requirement): ask once, use the more important gapIndex.
+- Skip gaps the CV already clearly covers, and gaps a yes/no can't settle (e.g. years of experience the dates already show).
+- English, plain, max ~15 words, no jargon beyond the job's own terms.
+Return {"questions": [{"question": "...", "gapIndex": n}]}.`,
+    input: `JOB\n${describeAnalysis(analysis)}\n\nGAPS\n${gaps.map((g, i) => `${i}. [${g.kind}, ${g.weight}] ${g.label}`).join("\n")}\n\nCV\n${cvForModel(data).text}`,
+  });
+  return out.questions.filter((q) => q.gapIndex >= 0 && q.gapIndex < gaps.length && q.question.trim()).slice(0, 10);
+}
+
+export interface BoostFact {
+  label: string;
+  requirementId?: string;
+  /** The question and the user's optional detail, both confirmed true. */
+  statement: string;
+}
+
+export async function boostSuggestions(data: ProfileData, analysis: JobAnalysis, language: Language, facts: BoostFact[]): Promise<Suggestion[]> {
+  const cv = cvForModel(data);
+  const out = await generateJson(z.object({ suggestions: z.array(ModelSuggestion) }), {
+    name: "boost_suggestions",
+    instructions: `The candidate confirmed the facts below are TRUE. Work all of them into the CV with as few, natural edits as possible:
+- Prefer weaving a fact into an existing related bullet or paragraph (rewrite_block, keep everything else in it, including numbers); otherwise add a bullet to the most relevant entry (insert_block); tools/skills without a story go into the most relevant skills list or entry tags (set_tags: that entry's current tags plus the new ones).
+- Several facts can share one edit. Never edit the same block twice: if two facts belong in one bullet, write that bullet once.
+- Use the job's exact wording for the keywords. Each confirmed fact counts as backed by the CV: newClaims stays [] unless you add something beyond the facts and the CV.
+- Every fact must appear somewhere in your edits.
+
+${TAILOR_RULES(language)}
+
+SCOPE (overrides the suggestion count above): make ONLY the edits needed to work in the confirmed facts, at most ${facts.length * 2} in total (aim for one per fact). These edits are applied without review, so do not touch anything unrelated to the facts: no general polishing, no summary or headline rewrite unless a fact belongs there.`,
+    input: `JOB\n${describeAnalysis(analysis)}\n\nCONFIRMED FACTS (true)\n${facts.map((f, i) => `${i + 1}. ${f.statement} (covers: ${f.label}${f.requirementId ? `, ${f.requirementId}` : ""})`).join("\n")}\n\nCV\n${cv.text}`,
+  });
+  const confirmed = facts.map((f) => f.statement).join("\n");
+  return out.suggestions
+    .map((m) => toSuggestion(m, cv.resolve))
+    .filter((s): s is Suggestion => s !== null)
+    .map((s) => ({ ...s, confirmedFacts: confirmed, status: "accepted" as const }))
+    // Hard cap in case the model over-edits: these are accepted without review.
+    .slice(0, facts.length * 2);
+}

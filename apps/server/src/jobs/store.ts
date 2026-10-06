@@ -20,6 +20,7 @@ interface JobRow {
   notes: string;
   cover_letter: string | null;
   sent: string | null;
+  boost: string;
   created_at: string;
   updated_at: string;
 }
@@ -46,6 +47,7 @@ function fromRow(r: JobRow): Job {
     notes: r.notes,
     coverLetter: parse(r.cover_letter),
     sent: parse(r.sent),
+    boost: JSON.parse(r.boost),
     createdAt: r.created_at,
     updatedAt: r.updated_at,
   });
@@ -97,10 +99,11 @@ const COLUMNS: Record<string, string> = {
   notes: "notes",
   coverLetter: "cover_letter",
   sent: "sent",
+  boost: "boost",
 };
 
 type JobPatch = Partial<
-  Pick<Job, "instructions" | "status" | "step" | "error" | "analysis" | "base" | "assessment" | "suggestions" | "appStatus" | "history" | "notes" | "coverLetter" | "sent">
+  Pick<Job, "instructions" | "status" | "step" | "error" | "analysis" | "base" | "assessment" | "suggestions" | "appStatus" | "history" | "notes" | "coverLetter" | "sent" | "boost">
 >;
 
 export function updateJob(id: string, patch: JobPatch): Job | null {

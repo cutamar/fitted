@@ -247,3 +247,18 @@ export function useAddToCv(jobId: string) {
     onSuccess: ({ job }) => qc.setQueryData(["jobs", jobId], job),
   });
 }
+
+// --- Quick boost ------------------------------------------------------------------
+
+export function useBoost(jobId: string) {
+  const qc = useQueryClient();
+  const set = (job: Job) => qc.setQueryData(["jobs", jobId], job);
+  return {
+    ask: useMutation({ mutationFn: () => request<Job>(`/jobs/${jobId}/boost`, json("POST")), onSuccess: set }),
+    apply: useMutation({
+      mutationFn: (v: { answers: { id: string; answer: "yes" | "no"; details: string }[]; acceptSafe: boolean }) =>
+        request<{ job: Job; added: number; acceptedSafe: number }>(`/jobs/${jobId}/boost/apply`, json("POST", v)),
+      onSuccess: (r) => set(r.job),
+    }),
+  };
+}

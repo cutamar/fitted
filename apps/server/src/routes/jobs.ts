@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import { z } from "zod";
-import { AppStatusSchema, CreateJobSchema, SuggestionStatusSchema, acceptedKey, applySuggestions, tailoredData, newId, type Job } from "@rb/shared";
-import { assess, analyzeJob, assessAndSuggest, regenerateSuggestion, suggestForGap, writeCoverLetter } from "../jobs/job-ai.ts";
+import { AppStatusSchema, computeScore, newId, unsupportedClaims, CreateJobSchema, SuggestionStatusSchema, acceptedKey, applySuggestions, tailoredData, type Job } from "@rb/shared";
+import { assess, analyzeJob, assessAndSuggest, boostQuestions, boostSuggestions, regenerateSuggestion, suggestForGap, writeCoverLetter, type BoostGap } from "../jobs/job-ai.ts";
 import { deleteJob, failInterruptedJobs, getJob, insertJob, listJobs, updateJob } from "../jobs/store.ts";
 import { HttpError } from "../errors.ts";
 import { getProfile } from "./profiles.ts";
@@ -63,6 +63,7 @@ export const jobRoutes = new Hono()
       notes: "",
       coverLetter: null,
       sent: null,
+      boost: [],
       createdAt: now,
       updatedAt: now,
     };
@@ -163,7 +164,8 @@ export const jobRoutes = new Hono()
     const req = body.requirementId ? job.analysis.requirements.find((r) => r.id === body.requirementId) : undefined;
     const label = req?.text ?? body.keyword;
     if (!label) return c.json({ error: "Pick a requirement or keyword." }, 400);
-    const s = await suggestForGap(job.base, job.analysis, job.language, {
+    // Against the tailored CV, so it builds on accepted changes instead of undoing them.
+    const s = await suggestForGap(tailoredData(job.base, job.suggestions), job.analysis, job.language, {
       label,
       kind: req ? "requirement" : "keyword",
       requirementId: req?.id,
@@ -173,6 +175,71 @@ export const jobRoutes = new Hono()
     if (!s) return c.json({ error: "ChatGPT couldn't place it. Try adding a sentence about where you used it." }, 502);
     const fresh = requireJob(job.id);
     return c.json({ job: updateJob(job.id, { suggestions: [...fresh.suggestions, s] }), suggestionId: s.id });
+  })
+  /** Quick boost, step 1: yes/no questions for the biggest remaining gaps. */
+  .post("/:id/boost", async (c) => {
+    const job = requireJob(c.req.param("id"));
+    if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
+    const current = tailoredData(job.base, job.suggestions);
+    const score = computeScore(current, job.analysis, job.assessment);
+    // Never ask about something already answered (by wording or by requirement).
+    const answered = job.boost.filter((q) => q.answer);
+    const asked = new Set([...answered.map((q) => q.label.toLowerCase()), ...answered.map((q) => q.requirementId).filter(Boolean)]);
+    const status = new Map(job.assessment?.requirements.map((r) => [r.id, r.status]));
+    const gaps: BoostGap[] = [
+      ...job.analysis.requirements
+        .filter((r) => status.get(r.id) !== "met")
+        .sort((a, b) => Number(b.mustHave) - Number(a.mustHave))
+        .map((r) => ({ label: r.text, kind: "requirement" as const, requirementId: r.id, weight: `${r.mustHave ? "must-have" : "nice-to-have"}, ${status.get(r.id) ?? "missing"}` })),
+      ...score.keywords.missing
+        .sort((a, b) => ["high", "medium", "low"].indexOf(a.importance) - ["high", "medium", "low"].indexOf(b.importance))
+        .map((k) => ({ label: k.term, kind: "keyword" as const, weight: `${k.importance}-importance keyword` })),
+    ].filter((g: BoostGap) => !asked.has(g.label.toLowerCase()) && !(g.requirementId && asked.has(g.requirementId)));
+    if (!gaps.length) return c.json({ error: "Nothing left to ask: every requirement and keyword is covered or already answered." }, 409);
+    const questions = (await boostQuestions(current, job.analysis, gaps)).map((q) => {
+      const g = gaps[q.gapIndex]!;
+      return { id: newId(), question: q.question.trim(), label: g.label, kind: g.kind, requirementId: g.requirementId ?? "", answer: null, details: "" };
+    });
+    // Keep answered questions (history), replace open ones with the new set.
+    return c.json(updateJob(job.id, { boost: [...job.boost.filter((q) => q.answer), ...questions] }));
+  })
+  /** Quick boost, step 2: turn "yes" answers into accepted changes; optionally accept safe open suggestions. */
+  .post("/:id/boost/apply", async (c) => {
+    const job = requireJob(c.req.param("id"));
+    if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
+    const body = z
+      .object({
+        answers: z.array(z.object({ id: z.string(), answer: z.enum(["yes", "no"]), details: z.string().default("") })),
+        acceptSafe: z.boolean().default(true),
+      })
+      .parse(await c.req.json());
+    const byId = new Map(body.answers.map((a) => [a.id, a]));
+    const boost = job.boost.map((q) => (byId.has(q.id) ? { ...q, answer: byId.get(q.id)!.answer, details: byId.get(q.id)!.details.trim() } : q));
+    const yes = boost.filter((q) => byId.has(q.id) && q.answer === "yes");
+
+    let suggestions = job.suggestions;
+    let acceptedSafe = 0;
+    if (body.acceptSafe) {
+      const context = tailoredData(job.base, suggestions);
+      suggestions = suggestions.map((s) => {
+        if (s.status !== "pending" || unsupportedClaims(s, job.base!, job.analysis!, context).length) return s;
+        acceptedSafe++;
+        return { ...s, status: "accepted" as const };
+      });
+    }
+    let added: typeof suggestions = [];
+    if (yes.length) {
+      added = await boostSuggestions(
+        tailoredData(job.base, suggestions),
+        job.analysis,
+        job.language,
+        yes.map((q) => ({ label: q.label, requirementId: q.requirementId || undefined, statement: `${q.question} Yes.${q.details ? ` ${q.details}` : ""}` })),
+      );
+      added = added.map((s) => (s.requirementIds.length ? s : { ...s, requirementIds: [...new Set(yes.map((q) => q.requirementId).filter(Boolean))] }));
+    }
+    const fresh = requireJob(job.id);
+    const merged = [...suggestions.filter((s) => fresh.suggestions.some((f) => f.id === s.id)), ...added];
+    return c.json({ job: updateJob(job.id, { boost, suggestions: merged }), added: added.length, acceptedSafe });
   })
   .post("/:id/suggestions/:sid/regenerate", async (c) => {
     const job = requireJob(c.req.param("id"));

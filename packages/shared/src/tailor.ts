@@ -111,7 +111,7 @@ export function applySuggestions(
         const hit = findItem(data, s.itemId);
         if (!hit) break;
         changes.tags[s.itemId] ??= hit.item.tags;
-        hit.item.tags = suggestionTags(s);
+        hit.item.tags = mergeTags(findItem(base, s.itemId)?.item.tags ?? [], hit.item.tags, suggestionTags(s));
         changes.sources[`tags:${s.itemId}`] = s.id;
         break;
       }
@@ -148,6 +148,25 @@ export function applySuggestions(
     }
   }
   return { data, changes };
+}
+
+/**
+ * A set_tags suggestion holds a full list proposed against the base profile.
+ * Apply it as a change relative to that base (what it adds, removes, reorders)
+ * so several tag suggestions on the same entry stack instead of overwriting.
+ */
+export function mergeTags(baseTags: string[], currentTags: string[], proposed: string[]): string[] {
+  const key = (t: string) => t.trim().toLowerCase();
+  const proposedKeys = new Set(proposed.map(key));
+  const removed = new Set(baseTags.map(key).filter((k) => !proposedKeys.has(k)));
+  const extra = currentTags.filter((t) => !proposedKeys.has(key(t)) && !removed.has(key(t)));
+  const seen = new Set<string>();
+  return [...proposed, ...extra].filter((t) => {
+    const k = key(t);
+    if (!k || seen.has(k)) return false;
+    seen.add(k);
+    return true;
+  });
 }
 
 // --- Text & keyword matching -----------------------------------------------------
@@ -292,13 +311,15 @@ export interface ClaimWarning {
  * Flags things a suggestion introduces that the master profile doesn't contain:
  * job keywords and numbers absent from the profile, plus what the model itself declared.
  */
-export function unsupportedClaims(s: Suggestion, master: ProfileData, analysis: JobAnalysis): ClaimWarning[] {
+export function unsupportedClaims(s: Suggestion, master: ProfileData, analysis: JobAnalysis, context?: ProfileData): ClaimWarning[] {
   const warnings: ClaimWarning[] = s.newClaims.map((text) => ({ kind: "model" as const, text }));
   if (s.type === "set_tags") {
-    const before = new Set(master.sections.flatMap((sec) => sec.items).find((i) => i.id === s.itemId)?.tags.map((t) => t.toLowerCase()) ?? []);
+    // Tags already accepted on this entry (context) aren't new claims.
+    const before = new Set((context ?? master).sections.flatMap((sec) => sec.items).find((i) => i.id === s.itemId)?.tags.map((t) => t.toLowerCase()) ?? []);
     for (const tag of suggestionTags(s)) if (!before.has(tag.toLowerCase())) warnings.push({ kind: "tag", text: tag });
   }
-  const masterText = normalizeForMatch(`${profileText(master)}\n${s.confirmedFacts}`);
+  // Changes the user already accepted count as known, like the master profile.
+  const masterText = normalizeForMatch(`${profileText(master)}\n${context ? profileText(context) : ""}\n${s.confirmedFacts}`);
   const proposed = s.type === "set_tags" ? suggestionTags(s).join(", ") : s.type === "remove_block" || s.type.endsWith("_item") ? "" : suggestionText(s);
   if (!proposed) return warnings;
   const proposedNorm = normalizeForMatch(proposed);

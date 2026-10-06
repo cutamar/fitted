@@ -24,6 +24,7 @@ app.onError((err, c) => {
   if (err instanceof HttpError) return c.json({ error: err.message }, err.status);
   if (err instanceof NotConnectedError) return c.json({ error: err.message, code: "not_connected" }, 401);
   if (err instanceof ChatGPTError) {
+    console.warn(`ChatGPT error on ${c.req.method} ${c.req.path}: ${err.code}: ${err.message}`);
     const status = err.status === 401 ? 401 : err.status >= 400 && err.status < 600 ? err.status : 502;
     return c.json({ error: err.message, code: err.code }, status as 400);
   }

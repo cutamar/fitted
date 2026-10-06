@@ -117,6 +117,20 @@ export const SentSnapshotSchema = z.object({
 });
 export type SentSnapshot = z.infer<typeof SentSnapshotSchema>;
 
+/** One yes/no question of Quick boost; a "yes" becomes accepted CV changes. */
+export const BoostQuestionSchema = z.object({
+  id: z.string(),
+  question: z.string(),
+  /** The keyword or requirement a "yes" would cover. */
+  label: z.string(),
+  kind: z.enum(["keyword", "requirement"]),
+  requirementId: z.string().default(""),
+  answer: z.enum(["yes", "no"]).nullable().default(null),
+  /** Optional detail the user adds to a "yes" (where, how, numbers). */
+  details: z.string().default(""),
+});
+export type BoostQuestion = z.infer<typeof BoostQuestionSchema>;
+
 export const JobStatusSchema = z.enum(["analyzing", "ready", "error"]);
 export type JobStatus = z.infer<typeof JobStatusSchema>;
 
@@ -144,6 +158,8 @@ export const JobSchema = z.object({
   notes: z.string().default(""),
   coverLetter: CoverLetterSchema.nullable().default(null),
   sent: SentSnapshotSchema.nullable().default(null),
+  /** Quick boost questions, answered and open. */
+  boost: z.array(BoostQuestionSchema).default([]),
   createdAt: z.string(),
   updatedAt: z.string(),
 });

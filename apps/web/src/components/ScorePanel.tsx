@@ -1,5 +1,5 @@
 import { useState, type ReactNode } from "react";
-import { Check, ChevronDown, ChevronRight, RefreshCw, X } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, RefreshCw, X, Zap } from "lucide-react";
 import type { Score } from "@rb/shared";
 import { Button, Card, Spinner, cx } from "./ui";
 
@@ -57,9 +57,10 @@ interface Props {
   fitStale: boolean;
   assessing: boolean;
   onAssess: () => void;
+  onBoost: () => void;
 }
 
-export function ScorePanel({ base, current, fitStale, assessing, onAssess }: Props) {
+export function ScorePanel({ base, current, fitStale, assessing, onAssess, onBoost }: Props) {
   const [showChecks, setShowChecks] = useState(false);
   const delta = current.overall - base.overall;
 
@@ -80,6 +81,9 @@ export function ScorePanel({ base, current, fitStale, assessing, onAssess }: Pro
           </div>
           <div className="mt-1 text-[11px] text-muted">40% keywords · 40% requirement fit · 20% ATS format</div>
         </div>
+        <Button variant="primary" size="sm" className="ml-auto self-start" onClick={onBoost} title="Answer a few yes/no questions to raise your score">
+          <Zap /> Quick boost
+        </Button>
       </div>
 
       <div className="mt-5 flex flex-col gap-4">

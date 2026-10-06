@@ -125,3 +125,21 @@ describe("unsupportedClaims with user-confirmed facts", () => {
     expect(unsupportedClaims(s, base, analysis)).toEqual([]);
   });
 });
+
+describe("set_tags stacking", () => {
+  it("keeps keywords added by earlier tag suggestions on the same entry", () => {
+    const s = [
+      sug({ type: "set_tags", itemId: item.id, tags: ["Python", "Docker", "Mixpanel"] }),
+      sug({ type: "set_tags", itemId: item.id, tags: ["Python", "Docker", "Amplitude"] }),
+      sug({ type: "set_tags", itemId: item.id, tags: ["Kubernetes", "Python", "Docker"] }),
+    ];
+    const tags = applySuggestions(base, s).data.sections[0]!.items[0]!.tags;
+    expect(tags).toEqual(["Kubernetes", "Python", "Docker", "Amplitude", "Mixpanel"]);
+  });
+
+  it("still applies removals and reordering", () => {
+    const s = [sug({ type: "set_tags", itemId: item.id, tags: ["Docker", "Go"] }), sug({ type: "set_tags", itemId: item.id, tags: ["Python", "Docker", "Rust"] })];
+    // First drops Python and adds Go; second (made against the base) keeps Python and adds Rust.
+    expect(applySuggestions(base, s).data.sections[0]!.items[0]!.tags).toEqual(["Python", "Docker", "Rust", "Go"]);
+  });
+});

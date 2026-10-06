@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { ArrowLeft, Check, CheckCheck, Languages, Plus, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowLeft, Check, CheckCheck, Languages, Plus, RefreshCw, Trash2, X, Zap } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router";
 import {
   acceptedKey,
@@ -15,6 +15,7 @@ import {
 import { CoverLetterTab, StatusBadge, TrackingCard } from "../components/Application";
 import { AddToCvForm } from "../components/AddToCv";
 import { CvPreview } from "../components/CvPreview";
+import { QuickBoost } from "../components/QuickBoost";
 import { ExportPanel } from "../components/ExportPanel";
 import { ScorePanel } from "../components/ScorePanel";
 import { SuggestionCard } from "../components/SuggestionCard";
@@ -138,7 +139,18 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
     return out;
   }, [pending, accepted, base, analysis, job.assessment, currentScore]);
 
-  const warnings = useMemo(() => Object.fromEntries(job.suggestions.map((s) => [s.id, unsupportedClaims(s, base, analysis)])), [job.suggestions, base, analysis]);
+  // The CV as it stands before each suggestion (earlier accepted ones applied):
+  // what its diff compares against, and what counts as already known.
+  const contexts = useMemo(() => {
+    const out: Record<string, ProfileData> = {};
+    job.suggestions.forEach((s, i) => (out[s.id] = applySuggestions(base, job.suggestions.slice(0, i).filter((x) => x.status === "accepted")).data));
+    return out;
+  }, [job.suggestions, base]);
+  const warnings = useMemo(
+    () => Object.fromEntries(job.suggestions.map((s) => [s.id, unsupportedClaims(s, base, analysis, contexts[s.id])])),
+    [job.suggestions, base, analysis, contexts],
+  );
+  const [boostOpen, setBoostOpen] = useState(false);
 
   const preview = useMemo(
     () =>
@@ -203,6 +215,9 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
                 {accepted.length} accepted · {pending.length} open · {job.suggestions.length - accepted.length - pending.length} rejected
               </span>
               <span className="ml-auto flex gap-2">
+                <Button size="sm" variant="primary" onClick={() => setBoostOpen(true)} title="Answer a few yes/no questions to raise your score">
+                  <Zap /> Quick boost
+                </Button>
                 {safePending.length > 0 && (
                   <Button
                     size="sm"
@@ -223,7 +238,7 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
               <SuggestionCard
                 key={s.id}
                 suggestion={s}
-                base={base}
+                base={contexts[s.id] ?? base}
                 analysis={analysis}
                 warnings={warnings[s.id] ?? []}
                 delta={s.status === "pending" ? (deltas[s.id] ?? null) : null}
@@ -249,7 +264,15 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
 
       <div className="flex flex-col gap-4 xl:sticky xl:top-8 xl:max-h-[calc(100dvh-4rem)] xl:overflow-y-auto xl:pb-4">
         <TrackingCard job={job} />
-        <ScorePanel base={baseScore} current={currentScore} fitStale={fitStale} assessing={actions.assess.isPending} onAssess={() => actions.assess.mutate()} />
+        <ScorePanel
+          base={baseScore}
+          current={currentScore}
+          fitStale={fitStale}
+          assessing={actions.assess.isPending}
+          onAssess={() => actions.assess.mutate()}
+          onBoost={() => setBoostOpen(true)}
+        />
+        {boostOpen && <QuickBoost job={job} onClose={() => setBoostOpen(false)} />}
         <ExportPanel
           kind="job"
           id={job.id}

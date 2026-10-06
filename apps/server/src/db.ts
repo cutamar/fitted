@@ -52,6 +52,7 @@ const migrations: string[] = [
    ALTER TABLE jobs ADD COLUMN notes TEXT NOT NULL DEFAULT '';
    ALTER TABLE jobs ADD COLUMN cover_letter TEXT;
    ALTER TABLE jobs ADD COLUMN sent TEXT;`,
+  `ALTER TABLE jobs ADD COLUMN boost TEXT NOT NULL DEFAULT '[]';`,
 ];
 
 const { user_version: current } = db.prepare("PRAGMA user_version").get() as { user_version: number };
