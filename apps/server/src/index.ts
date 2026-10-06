@@ -7,7 +7,9 @@ import { ZodError } from "zod";
 import { appOrigin, config } from "./config.ts";
 import { NotConnectedError, OAuthError, handleCallback } from "./chatgpt/auth.ts";
 import { ChatGPTError } from "./chatgpt/client.ts";
+import { HttpError } from "./errors.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { jobRoutes } from "./routes/jobs.ts";
 import { importRoutes } from "./routes/imports.ts";
 import { profileRoutes } from "./routes/profiles.ts";
 
@@ -18,6 +20,7 @@ const app = new Hono();
 
 app.onError((err, c) => {
   if (err instanceof ZodError) return c.json({ error: "Invalid request", issues: err.issues }, 400);
+  if (err instanceof HttpError) return c.json({ error: err.message }, err.status);
   if (err instanceof NotConnectedError) return c.json({ error: err.message, code: "not_connected" }, 401);
   if (err instanceof ChatGPTError) {
     const status = err.status === 401 ? 401 : err.status >= 400 && err.status < 600 ? err.status : 502;
@@ -50,6 +53,7 @@ app.get("/api/health", (c) => c.json({ ok: true }));
 app.route("/api/auth", authRoutes);
 app.route("/api/profiles", profileRoutes);
 app.route("/api/imports", importRoutes);
+app.route("/api/jobs", jobRoutes);
 
 app.get("/callback", async (c) => {
   try {

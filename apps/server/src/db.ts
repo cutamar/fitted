@@ -30,6 +30,23 @@ const migrations: string[] = [
      key TEXT PRIMARY KEY,
      value TEXT NOT NULL
    );`,
+  `CREATE TABLE jobs (
+     id TEXT PRIMARY KEY,
+     description TEXT NOT NULL,
+     instructions TEXT NOT NULL DEFAULT '',
+     profile_id TEXT REFERENCES profiles(id) ON DELETE SET NULL,
+     profile_name TEXT NOT NULL,
+     language TEXT NOT NULL,
+     status TEXT NOT NULL,
+     step TEXT NOT NULL DEFAULT '',
+     error TEXT,
+     analysis TEXT,
+     base TEXT,
+     assessment TEXT,
+     suggestions TEXT NOT NULL DEFAULT '[]',
+     created_at TEXT NOT NULL,
+     updated_at TEXT NOT NULL
+   );`,
 ];
 
 const { user_version: current } = db.prepare("PRAGMA user_version").get() as { user_version: number };

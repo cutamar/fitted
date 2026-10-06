@@ -7,6 +7,7 @@ import { Logo } from "./components/Logo";
 import { Notice, cx } from "./components/ui";
 import { ImportPage } from "./pages/ImportPage";
 import { ImportReviewPage } from "./pages/ImportReviewPage";
+import { JobPage } from "./pages/JobPage";
 import { JobsPage } from "./pages/JobsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ProfilesPage } from "./pages/ProfilesPage";
@@ -70,6 +71,7 @@ export function App() {
           <Route path="/imports/:id" element={<ImportReviewPage />} />
           <Route path="/profiles/:id" element={<ProfilePage />} />
           <Route path="/jobs" element={<JobsPage />} />
+          <Route path="/jobs/:id" element={<JobPage />} />
         </Routes>
       </main>
     </div>

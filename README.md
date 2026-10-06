@@ -6,17 +6,22 @@ Runs only on your machine. Your CVs live in a local SQLite database.
 
 ## Features
 
-**Milestone 1 (done)**
-- Sign in with ChatGPT (OAuth + PKCE, dynamic client registration), model picker, sign-out with token revocation
-- Multiple master profiles (e.g. "Product Owner", "Sales"), each a standalone CV; duplicate to branch off
-- Generic sections: work experience, education, skills, languages, certifications, projects, volunteering, awards, publications, and custom sections
-- Import from PDF / DOCX → AI maps the text into sections → side-by-side review against the original text to fix mappings
-- Profile language (English / German) — suggestions will always be written in the profile's language, even for job ads in another language
+**Profiles**
+- Multiple master profiles (e.g. "DevOps", "Product Owner"), each a standalone CV with its own language (English / German); duplicate to branch off
+- Generic sections (experience, education, skills, languages, certifications, projects, volunteering, awards, publications, custom); entries hold an ordered mix of paragraphs and bullets
+- Import from PDF / DOCX → ChatGPT maps it into sections → review side by side with the original text
+- Live A4 preview in an ATS-friendly single-column layout
 
-**Milestone 2 (next)**
-- Paste a job description, pick a profile → score breakdown (keyword/requirement coverage + AI assessment)
-- Suggestion cards with word-level diffs: accept / reject / edit / regenerate with instructions
+**Job matching**
+- Paste a job ad, pick a profile → requirements and ATS keywords are extracted (translated into the profile's language; the ad's original terms still count as matches)
+- Score = 40% keyword coverage + 40% requirement fit (ChatGPT, re-checkable) + 20% ATS format checks; keyword and format parts update live as you accept changes
+- Suggestion cards with word-level diffs, score impact, and requirement links: accept / reject / edit / regenerate with your own instruction
+- Truth guard: suggestions that add keywords, numbers, or tags missing from your master profile are flagged; "accept all safe" skips them
+- Tailored CV preview with changes highlighted; master profile stays untouched
+
+**Next**
 - ATS-safe export (DOCX + PDF) with a re-parse check
+- Application tracking, cover letters
 
 ## Run (Docker)
 
