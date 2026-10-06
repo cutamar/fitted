@@ -235,7 +235,9 @@ export function paginate(units: Pick<Unit, "pad" | "keepWithNext">[], heights: n
 /** Measures every unit offscreen, then lays them out on A4 pages. */
 function usePages(units: Unit[]): { pages: number[][] | null; measurer: ReactNode } {
   const box = useRef<HTMLDivElement>(null);
-  const [pages, setPages] = useState<number[][] | null>(null);
+  // Layout is only valid for the units it was measured from: after an edit
+  // (e.g. a removed entry) old indexes may point past the new units.
+  const [layout, setLayout] = useState<{ units: Unit[]; pages: number[][] } | null>(null);
   const [fontsTick, setFontsTick] = useState(0);
 
   useLayoutEffect(() => {
@@ -248,9 +250,10 @@ function usePages(units: Unit[]): { pages: number[][] | null; measurer: ReactNod
     // The measurer may sit inside a scaled container; undo the scale.
     const scale = el.getBoundingClientRect().width / CONTENT_W || 1;
     const heights = Array.from(el.children, (c) => c.getBoundingClientRect().height / scale);
-    const next = paginate(units, heights);
-    setPages((prev) => (JSON.stringify(prev) === JSON.stringify(next) ? prev : next));
+    const pages = paginate(units, heights);
+    setLayout((prev) => (prev && prev.units === units && JSON.stringify(prev.pages) === JSON.stringify(pages) ? prev : { units, pages }));
   }, [units, fontsTick]);
+  const pages = layout?.units === units ? layout.pages : null;
 
   // Zero-height, clipped wrapper: measurable, but adds no height (no extra printed pages).
   const measurer = (
