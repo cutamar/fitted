@@ -195,3 +195,24 @@ export function useJobActions(id: string) {
     reanalyze: useJobMutation(id, (v: { refreshProfile: boolean; instructions?: string }) => request<Job>(`/jobs/${id}/analyze`, json("POST", v))),
   };
 }
+
+// --- Export ------------------------------------------------------------------
+
+export type ExportKind = "profile" | "job";
+
+export interface AtsReport {
+  format: "pdf" | "docx";
+  ok: boolean;
+  pages: number | null;
+  total: number;
+  found: number;
+  missing: { label: string; text: string }[];
+  orderOk: boolean;
+  text: string;
+}
+
+export const exportUrl = (kind: ExportKind, id: string, format: "pdf" | "docx") => `/api/export/${kind}/${id}/cv.${format}`;
+
+export function useAtsCheck(kind: ExportKind, id: string) {
+  return useMutation({ mutationFn: () => request<AtsReport[]>(`/export/${kind}/${id}/check`) });
+}

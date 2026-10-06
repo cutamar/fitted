@@ -1,5 +1,6 @@
 import { createContext, useContext, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { CV_LABELS, formatCvDateRange, type Block, type ChangeSet, type Item, type Language, type ProfileData, type Section } from "@rb/shared";
+import { cx } from "./ui";
 import { TagsDiff, WordDiff } from "./WordDiff";
 
 /** A4 at 96 dpi. */
@@ -63,7 +64,11 @@ export function CvPreview({ data, language, changes = null }: { data: ProfileDat
   );
 }
 
-export function CvDocument({ data, language }: { data: ProfileData; language: Language }) {
+/**
+ * The CV itself. `print` drops the sheet padding because @page margins apply
+ * on every printed page. Ligatures are off so extracted text stays plain ("fi", not "ﬁ").
+ */
+export function CvDocument({ data, language, print = false }: { data: ProfileData; language: Language; print?: boolean }) {
   const changes = useContext(ChangesContext);
   const { basics } = data;
   const contact = [basics.location, basics.phone, basics.email, ...basics.links.map((l) => l.url)].filter(Boolean);
@@ -72,7 +77,10 @@ export function CvDocument({ data, language }: { data: ProfileData; language: La
   const summary = changes?.summary !== undefined ? <WordDiff paper before={changes.summary} after={basics.summary} /> : basics.summary;
 
   return (
-    <div className="px-[56px] py-[48px] font-sans text-[10.5pt] leading-[1.45]">
+    <div
+      className={cx("font-cv text-[10.5pt] leading-[1.45]", !print && "px-[56px] py-[48px]")}
+      style={{ fontVariantLigatures: "none", fontFeatureSettings: '"liga" 0, "calt" 0' }}
+    >
       <header>
         <h1 className="text-[22pt] leading-tight font-bold tracking-tight">{basics.fullName || "Your Name"}</h1>
         {(basics.headline || changes?.headline) && <div className="mt-0.5 text-[12pt] font-medium text-[#4f46e5]">{headline}</div>}

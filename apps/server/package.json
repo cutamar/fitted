@@ -11,9 +11,11 @@
   "dependencies": {
     "@hono/node-server": "^2.1.3",
     "@rb/shared": "workspace:*",
+    "docx": "^9.8.1",
     "hono": "^4.13.13",
     "jose": "^6.2.12",
     "mammoth": "^1.13.0",
+    "playwright-core": "^1.63.0",
     "unpdf": "^1.8.1",
     "zod": "^4.6.5"
   },

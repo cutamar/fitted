@@ -9,6 +9,7 @@ import { NotConnectedError, OAuthError, handleCallback } from "./chatgpt/auth.ts
 import { ChatGPTError } from "./chatgpt/client.ts";
 import { HttpError } from "./errors.ts";
 import { authRoutes } from "./routes/auth.ts";
+import { exportRoutes } from "./routes/export.ts";
 import { jobRoutes } from "./routes/jobs.ts";
 import { importRoutes } from "./routes/imports.ts";
 import { profileRoutes } from "./routes/profiles.ts";
@@ -54,6 +55,7 @@ app.route("/api/auth", authRoutes);
 app.route("/api/profiles", profileRoutes);
 app.route("/api/imports", importRoutes);
 app.route("/api/jobs", jobRoutes);
+app.route("/api/export", exportRoutes);
 
 app.get("/callback", async (c) => {
   try {

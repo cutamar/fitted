@@ -312,3 +312,11 @@ export function unsupportedClaims(s: Suggestion, master: ProfileData, analysis: 
   }
   return warnings;
 }
+
+/** The CV for an application: base snapshot plus accepted suggestions. */
+export function tailoredData(base: ProfileData, suggestions: Suggestion[]): ProfileData {
+  return applySuggestions(
+    base,
+    suggestions.filter((s) => s.status === "accepted"),
+  ).data;
+}

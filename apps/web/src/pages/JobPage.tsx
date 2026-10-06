@@ -13,6 +13,7 @@ import {
   type Suggestion,
 } from "@rb/shared";
 import { CvPreview } from "../components/CvPreview";
+import { ExportPanel } from "../components/ExportPanel";
 import { ScorePanel } from "../components/ScorePanel";
 import { SuggestionCard } from "../components/SuggestionCard";
 import { Badge, Button, Card, Notice, Spinner, cx } from "../components/ui";
@@ -228,6 +229,12 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
 
       <div className="flex flex-col gap-4 xl:sticky xl:top-8 xl:max-h-[calc(100dvh-4rem)] xl:overflow-y-auto xl:pb-4">
         <ScorePanel base={baseScore} current={currentScore} fitStale={fitStale} assessing={actions.assess.isPending} onAssess={() => actions.assess.mutate()} />
+        <ExportPanel
+          kind="job"
+          id={job.id}
+          version={acceptedKey(job.suggestions)}
+          blockedReason={accepted.length === 0 ? "No suggestions accepted yet: the export would be identical to your master profile." : null}
+        />
         <div className="rounded-xl bg-subtle p-4">
           <div className="mb-3 flex flex-wrap items-center gap-x-4 gap-y-2 text-xs">
             <span className="font-semibold text-sm">Tailored CV</span>

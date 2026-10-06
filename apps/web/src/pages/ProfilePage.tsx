@@ -3,6 +3,7 @@ import { ArrowLeft, Check } from "lucide-react";
 import { Link, useParams } from "react-router";
 import { LANGUAGES, LANGUAGE_NAMES, type ProfileInput } from "@rb/shared";
 import { CvPreview } from "../components/CvPreview";
+import { ExportPanel } from "../components/ExportPanel";
 import { ProfileEditor } from "../components/ProfileEditor";
 import { Button, Notice, Select, Spinner } from "../components/ui";
 import { useProfile, useUpdateProfile } from "../lib/api";
@@ -85,8 +86,16 @@ export function ProfilePage() {
 
       <div className="grid items-start gap-6 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
         <ProfileEditor value={draft.data} onChange={(data) => setDraft({ ...draft, data })} language={draft.language} />
-        <div className="sticky top-8 hidden max-h-[calc(100dvh-4rem)] overflow-y-auto rounded-xl bg-subtle p-5 xl:block">
-          <CvPreview data={draft.data} language={draft.language} />
+        <div className="flex flex-col gap-4 xl:sticky xl:top-8 xl:max-h-[calc(100dvh-4rem)] xl:overflow-y-auto xl:pb-4">
+          <ExportPanel
+            kind="profile"
+            id={profile.id}
+            version={profile.updatedAt}
+            blockedReason={dirty ? "You have unsaved changes. Save first: exports use the saved version." : null}
+          />
+          <div className="rounded-xl bg-subtle p-5">
+            <CvPreview data={draft.data} language={draft.language} />
+          </div>
         </div>
       </div>
     </div>

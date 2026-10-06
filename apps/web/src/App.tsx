@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Briefcase, FileText } from "lucide-react";
-import { NavLink, Route, Routes, useSearchParams } from "react-router";
+import { NavLink, Route, Routes, useLocation, useSearchParams } from "react-router";
 import { BRAND } from "@rb/shared";
 import { AccountCard } from "./components/AccountCard";
 import { Logo } from "./components/Logo";
@@ -10,6 +10,7 @@ import { ImportReviewPage } from "./pages/ImportReviewPage";
 import { JobPage } from "./pages/JobPage";
 import { JobsPage } from "./pages/JobsPage";
 import { ProfilePage } from "./pages/ProfilePage";
+import { PrintPage } from "./pages/PrintPage";
 import { ProfilesPage } from "./pages/ProfilesPage";
 
 const NAV = [
@@ -18,6 +19,18 @@ const NAV = [
 ];
 
 export function App() {
+  // The print page renders only the CV, without the app shell.
+  if (useLocation().pathname.startsWith("/print/")) {
+    return (
+      <Routes>
+        <Route path="/print/:kind/:id" element={<PrintPage />} />
+      </Routes>
+    );
+  }
+  return <Shell />;
+}
+
+function Shell() {
   const authError = useAuthRedirectMessage();
 
   const navClass = ({ isActive }: { isActive: boolean }) =>

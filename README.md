@@ -19,8 +19,12 @@ Runs only on your machine. Your CVs live in a local SQLite database.
 - Truth guard: suggestions that add keywords, numbers, or tags missing from your master profile are flagged; "accept all safe" skips them
 - Tailored CV preview with changes highlighted; master profile stays untouched
 
+**Export**
+- PDF (headless Chromium prints the same component as the live preview; real text, embedded static fonts) and Word (native headings and bullet lists)
+- Export the master profile or a job's tailored CV (accepted suggestions only); file names like `Name_CV_Company.pdf`
+- ATS readability check: re-extracts text from both files like a parser does and verifies every heading, job, date, bullet and skill made it, in order; shows "what an ATS sees"
+
 **Next**
-- ATS-safe export (DOCX + PDF) with a re-parse check
 - Application tracking, cover letters
 
 ## Run (Docker)
@@ -36,6 +40,8 @@ Data persists in the `resume-data` Docker volume (`/data` in the container): dat
 Different port: `PORT=9000 docker compose up -d` and open `http://127.0.0.1:9000`.
 
 Reset everything: `docker compose down -v`.
+
+The image includes Chromium for PDF export (~1.4 GB in total). For local development without Docker, PDF export uses `/usr/bin/chromium` or `CHROMIUM_PATH`.
 
 ### ChatGPT plan usage
 

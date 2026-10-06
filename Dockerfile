@@ -17,6 +17,11 @@ RUN pnpm build
 
 FROM base AS runtime
 ENV NODE_ENV=production
+# Headless Chromium prints the PDF export.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends chromium fonts-liberation \
+ && rm -rf /var/lib/apt/lists/*
+ENV CHROMIUM_PATH=/usr/bin/chromium
 RUN pnpm install --prod --frozen-lockfile --filter @rb/server... && pnpm store prune
 COPY --from=build /app/apps/server/dist apps/server/dist
 COPY --from=build /app/apps/web/dist apps/web/dist
