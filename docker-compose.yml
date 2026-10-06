@@ -1,0 +1,16 @@
+services:
+  app:
+    build: .
+    image: resume-builder:local
+    ports:
+      # Only reachable from this machine. Sign in with ChatGPT redirects to
+      # http://127.0.0.1:<port>/callback, so open the app via 127.0.0.1.
+      - "127.0.0.1:${PORT:-8787}:8787"
+    environment:
+      PUBLIC_PORT: ${PORT:-8787}
+    volumes:
+      - resume-data:/data
+    restart: unless-stopped
+
+volumes:
+  resume-data:
