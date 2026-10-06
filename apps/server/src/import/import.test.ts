@@ -26,7 +26,7 @@ describe("toProfileData", () => {
       language: "en",
       basics: { fullName: "Jane Doe", headline: "", email: "", phone: "", location: "", links: [], summary: "" },
       sections: [
-        { kind: "certifications", title: " ", items: [{ title: "PSPO I", subtitle: "Scrum.org", location: "", startDate: "2022", endDate: "", current: false, description: "", bullets: [], tags: [], url: "" }] },
+        { kind: "certifications", title: " ", items: [{ title: "PSPO I", subtitle: "Scrum.org", location: "", startDate: "2022", endDate: "", current: false, content: [{ type: "text", text: "Scrum" }, { type: "bullet", text: " " }], tags: [], url: "" }] },
         { kind: "custom", title: "Hobbies", items: [] },
       ],
     });
@@ -35,5 +35,7 @@ describe("toProfileData", () => {
     expect(data.sections[0]!.title).toBe("Zertifikate");
     expect(data.sections[1]!.title).toBe("Hobbies");
     expect(data.sections[0]!.items[0]!.id).toMatch(/^[0-9a-f-]{36}$/);
+    // Empty blocks are dropped, the rest get ids.
+    expect(data.sections[0]!.items[0]!.content).toEqual([{ id: expect.any(String), type: "text", text: "Scrum" }]);
   });
 });

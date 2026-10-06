@@ -1,5 +1,6 @@
 import { z } from "zod";
 import {
+  BLOCK_TYPES,
   LANGUAGES,
   SECTION_KINDS,
   SECTION_TITLES,
@@ -18,8 +19,7 @@ const MappedItem = z.object({
   startDate: z.string(),
   endDate: z.string(),
   current: z.boolean(),
-  description: z.string(),
-  bullets: z.array(z.string()),
+  content: z.array(z.object({ type: z.enum(BLOCK_TYPES), text: z.string() })),
   tags: z.array(z.string()),
   url: z.string(),
 });
@@ -51,13 +51,13 @@ Rules:
 - Copy wording exactly as written. Do not rephrase, translate, summarize, fix, or invent anything. Missing values are "".
 - Keep the CV's original section headings as "title". Pick the closest "kind"; anything that fits none (hobbies, references, interests, personal data, etc.) is "custom" with its original heading. Never drop content.
 - Item field meaning by kind:
-  experience/volunteering: title=role, subtitle=company/organisation, location=city/country. A "Skills:"/"Tech stack:"/"Technologies:" line inside an entry goes into tags (one skill per tag), not into description.
+  experience/volunteering: title=role, subtitle=company/organisation, location=city/country. A "Skills:"/"Tech stack:"/"Technologies:" line inside an entry goes into tags (one skill per tag), not into content.
   education: title=degree together with field of study (e.g. "Master of Science, Computer Science"), subtitle=institution name, location=city/country only if written.
   skills: one item per skill group; title=group name ("" if ungrouped), tags=individual skills.
   languages: one item per language; title=language, subtitle=level as written.
   certifications/awards: title=name, subtitle=issuer; date in startDate.
   projects/publications: title=name, subtitle=role or venue; technologies in tags.
-- Achievement/responsibility lines become "bullets" (without bullet symbols). Running prose goes in "description".
+- An entry's body goes into "content" as an ordered list of blocks, in the exact order it appears: each paragraph of prose is one {"type":"text"} block, each bullet/list line is one {"type":"bullet"} block (without the bullet symbol). Any mix and order is valid (only prose, only bullets, prose then bullets then prose, ...). Join lines of one paragraph or one bullet that the extraction broke apart.
 - Dates: use "YYYY-MM" when month and year are clear, "YYYY" when only the year is known, otherwise keep the text as written. Ongoing roles ("present", "heute", "bis jetzt") set current=true and endDate="".
 - The text was extracted from a PDF/DOCX, so columns may be interleaved and line breaks may be wrong. Reassemble lines that belong together.
 - basics.links: label each link by what it is ("LinkedIn", "GitHub", "Portfolio", "Website", ...). Do not repeat email or phone as links.
@@ -77,7 +77,12 @@ export function toProfileData(mapped: MappedCv, language: Language): ProfileData
       kind: s.kind,
       title: s.title.trim() || SECTION_TITLES[language][s.kind],
       hidden: false,
-      items: s.items.map((i) => ({ ...i, id: newId(), hidden: false })),
+      items: s.items.map((i) => ({
+        ...i,
+        id: newId(),
+        hidden: false,
+        content: i.content.filter((b) => b.text.trim()).map((b) => ({ ...b, id: newId() })),
+      })),
     })),
   };
 }

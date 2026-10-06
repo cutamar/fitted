@@ -31,23 +31,55 @@ export const LinkSchema = z.object({
 });
 export type Link = z.infer<typeof LinkSchema>;
 
-export const ItemSchema = z.object({
+export const BLOCK_TYPES = ["text", "bullet"] as const;
+export const BlockTypeSchema = z.enum(BLOCK_TYPES);
+export type BlockType = z.infer<typeof BlockTypeSchema>;
+
+/**
+ * One paragraph or one bullet point. An entry's body is an ordered list of
+ * blocks, so any mix works: only prose, only bullets, prose → bullets → prose.
+ * Consecutive bullets render as one list.
+ */
+export const BlockSchema = z.object({
   id: z.string(),
-  /** Role, degree, certificate name, language, skill group, ... */
-  title: z.string().default(""),
-  /** Company, institution, issuer, proficiency level, ... */
-  subtitle: z.string().default(""),
-  location: z.string().default(""),
-  /** "YYYY-MM", "YYYY" or free text as written in the CV. */
-  startDate: z.string().default(""),
-  endDate: z.string().default(""),
-  current: z.boolean().default(false),
-  description: z.string().default(""),
-  bullets: z.array(z.string()).default([]),
-  tags: z.array(z.string()).default([]),
-  url: z.string().default(""),
-  hidden: z.boolean().default(false),
+  type: BlockTypeSchema,
+  text: z.string().default(""),
 });
+export type Block = z.infer<typeof BlockSchema>;
+
+/** Converts the earlier description + bullets shape into blocks. */
+function upgradeLegacyItem(raw: unknown): unknown {
+  if (!raw || typeof raw !== "object" || "content" in raw) return raw;
+  const { description, bullets, ...rest } = raw as { description?: unknown; bullets?: unknown };
+  const content: Block[] = [];
+  if (typeof description === "string" && description.trim()) {
+    content.push({ id: crypto.randomUUID(), type: "text", text: description });
+  }
+  if (Array.isArray(bullets)) {
+    for (const b of bullets) if (typeof b === "string") content.push({ id: crypto.randomUUID(), type: "bullet", text: b });
+  }
+  return { ...rest, content };
+}
+
+export const ItemSchema = z.preprocess(
+  upgradeLegacyItem,
+  z.object({
+    id: z.string(),
+    /** Role, degree, certificate name, language, skill group, ... */
+    title: z.string().default(""),
+    /** Company, institution, issuer, proficiency level, ... */
+    subtitle: z.string().default(""),
+    location: z.string().default(""),
+    /** "YYYY-MM", "YYYY" or free text as written in the CV. */
+    startDate: z.string().default(""),
+    endDate: z.string().default(""),
+    current: z.boolean().default(false),
+    content: z.array(BlockSchema).default([]),
+    tags: z.array(z.string()).default([]),
+    url: z.string().default(""),
+    hidden: z.boolean().default(false),
+  }),
+);
 export type Item = z.infer<typeof ItemSchema>;
 
 export const SectionSchema = z.object({
@@ -91,8 +123,3 @@ export const ProfileSchema = ProfileInputSchema.extend({
   updatedAt: z.string(),
 });
 export type Profile = z.infer<typeof ProfileSchema>;
-
-export type ProfileSummary = Pick<Profile, "id" | "name" | "language" | "createdAt" | "updatedAt"> & {
-  fullName: string;
-  sectionCount: number;
-};

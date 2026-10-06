@@ -1,5 +1,5 @@
 import { SECTION_TITLES } from "./i18n.ts";
-import type { Item, Language, ProfileData, Section, SectionKind } from "./profile.ts";
+import type { Block, BlockType, Item, Language, ProfileData, Section, SectionKind } from "./profile.ts";
 
 export function newId(): string {
   return crypto.randomUUID();
@@ -14,12 +14,15 @@ export function emptyItem(): Item {
     startDate: "",
     endDate: "",
     current: false,
-    description: "",
-    bullets: [],
+    content: [],
     tags: [],
     url: "",
     hidden: false,
   };
+}
+
+export function newBlock(type: BlockType, text = ""): Block {
+  return { id: newId(), type, text };
 }
 
 export function emptySection(kind: SectionKind, language: Language): Section {
@@ -40,7 +43,11 @@ export function cloneProfileData(data: ProfileData): ProfileData {
     sections: data.sections.map((s) => ({
       ...structuredClone(s),
       id: newId(),
-      items: s.items.map((i) => ({ ...structuredClone(i), id: newId() })),
+      items: s.items.map((i) => ({
+        ...structuredClone(i),
+        id: newId(),
+        content: i.content.map((b) => ({ ...b, id: newId() })),
+      })),
     })),
   };
 }

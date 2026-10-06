@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router";
 import { LANGUAGES, LANGUAGE_NAMES, type Language, type ProfileData } from "@rb/shared";
+import { CvPreview } from "../components/CvPreview";
 import { ProfileEditor } from "../components/ProfileEditor";
-import { Button, Card, Field, Input, Notice, Select, Spinner } from "../components/ui";
+import { Button, Card, Field, Input, Notice, PageHeader, Select, Spinner, cx } from "../components/ui";
 import { deleteImport, useCreateProfile, useImport } from "../lib/api";
 
 export function ImportReviewPage() {
@@ -14,6 +15,7 @@ export function ImportReviewPage() {
   const [draft, setDraft] = useState<ProfileData | null>(null);
   const [name, setName] = useState("");
   const [language, setLanguage] = useState<Language>("en");
+  const [panel, setPanel] = useState<"original" | "preview">("original");
 
   useEffect(() => {
     if (!rec || draft) return;
@@ -33,15 +35,13 @@ export function ImportReviewPage() {
   };
 
   return (
-    <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold tracking-tight">Review import</h1>
-        <p className="mt-1 text-sm text-muted">
-          Check every section against the original text on the left. Fix wrong mappings, move entries between sections, add what's missing.
-        </p>
-      </div>
-      <div className="flex flex-wrap items-end gap-3">
-        <Field label="Profile name" className="mr-auto min-w-60 flex-1">
+    <div className="flex flex-col gap-5">
+      <PageHeader
+        title="Review import"
+        description="Compare each section with the original text. Fix mappings, move entries between sections, and add anything that's missing."
+      />
+      <Card className="flex flex-wrap items-end gap-3 p-4">
+        <Field label="Profile name" className="min-w-60 flex-1">
           <Input value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field label="CV language">
@@ -66,16 +66,40 @@ export function ImportReviewPage() {
         <Button variant="primary" onClick={save} disabled={!name.trim() || create.isPending}>
           Save as profile
         </Button>
-      </div>
+      </Card>
 
       {rec.status === "unmapped" && <Notice>Automatic mapping didn't run: {rec.error}</Notice>}
       {create.error && <Notice tone="error">{(create.error as Error).message}</Notice>}
 
-      <div className="grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,3fr)]">
-        <Card className="self-start lg:sticky lg:top-20">
-          <div className="border-b border-border px-4 py-2 text-xs font-medium text-muted">Original text · {rec.fileName}</div>
-          <pre className="max-h-[calc(100dvh-10rem)] overflow-auto whitespace-pre-wrap p-4 font-sans text-xs leading-relaxed">{rec.text}</pre>
-        </Card>
+      <div className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+        <div className="flex flex-col gap-3 lg:sticky lg:top-8">
+          <div className="inline-flex self-start rounded-lg bg-subtle p-1">
+            {(["original", "preview"] as const).map((p) => (
+              <button
+                key={p}
+                type="button"
+                onClick={() => setPanel(p)}
+                className={cx(
+                  "rounded-md px-3 py-1 text-sm font-medium transition",
+                  panel === p ? "bg-surface text-fg shadow-sm" : "text-muted hover:text-fg",
+                )}
+              >
+                {p === "original" ? `Original · ${rec.fileName}` : "CV preview"}
+              </button>
+            ))}
+          </div>
+          <div className="max-h-[calc(100dvh-8rem)] overflow-y-auto rounded-xl">
+            {panel === "original" ? (
+              <Card>
+                <pre className="p-5 font-sans text-xs leading-relaxed whitespace-pre-wrap">{rec.text}</pre>
+              </Card>
+            ) : (
+              <div className="bg-subtle p-5">
+                <CvPreview data={draft} language={language} />
+              </div>
+            )}
+          </div>
+        </div>
         <ProfileEditor value={draft} onChange={setDraft} language={language} />
       </div>
     </div>

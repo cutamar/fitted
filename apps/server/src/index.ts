@@ -71,6 +71,6 @@ if (config.webDir) {
 }
 
 serve({ fetch: app.fetch, hostname: config.host, port: config.port }, () => {
-  console.log(`Resume Builder running → open ${appOrigin}`);
+  console.log(`Fitted running → open ${appOrigin}`);
   if (config.host !== "127.0.0.1") console.log(`(listening on ${config.host}:${config.port})`);
 });

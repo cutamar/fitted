@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
+import { Briefcase, FileText } from "lucide-react";
 import { NavLink, Route, Routes, useSearchParams } from "react-router";
-import { ChatGPTStatus } from "./components/ChatGPTStatus";
+import { BRAND } from "@rb/shared";
+import { AccountCard } from "./components/AccountCard";
+import { Logo } from "./components/Logo";
 import { Notice, cx } from "./components/ui";
 import { ImportPage } from "./pages/ImportPage";
 import { ImportReviewPage } from "./pages/ImportReviewPage";
@@ -8,31 +11,54 @@ import { JobsPage } from "./pages/JobsPage";
 import { ProfilePage } from "./pages/ProfilePage";
 import { ProfilesPage } from "./pages/ProfilesPage";
 
+const NAV = [
+  { to: "/", label: "Profiles", icon: FileText, end: true },
+  { to: "/jobs", label: "Jobs", icon: Briefcase, end: false },
+];
+
 export function App() {
   const authError = useAuthRedirectMessage();
 
-  const nav = ({ isActive }: { isActive: boolean }) =>
-    cx("rounded-md px-3 py-1.5 text-sm", isActive ? "bg-subtle font-medium text-fg" : "text-muted hover:text-fg");
+  const navClass = ({ isActive }: { isActive: boolean }) =>
+    cx(
+      "flex items-center gap-2.5 rounded-lg px-3 py-2 text-sm font-medium transition [&_svg]:size-4",
+      isActive ? "bg-accent-soft text-accent-soft-fg" : "text-muted hover:bg-subtle hover:text-fg",
+    );
 
   return (
-    <div className="min-h-dvh">
-      <header className="sticky top-0 z-10 border-b border-border bg-surface/90 backdrop-blur">
-        <div className="mx-auto flex h-14 max-w-6xl items-center gap-4 px-4">
-          <span className="font-semibold tracking-tight">Resume Builder</span>
-          <nav className="flex gap-1">
-            <NavLink to="/" end className={nav}>
-              Profiles
+    <div className="min-h-dvh md:pl-64">
+      <aside className="fixed inset-y-0 left-0 hidden w-64 flex-col border-r border-border bg-surface px-4 py-5 md:flex">
+        <div className="px-1">
+          <Logo />
+          <p className="mt-1 text-xs text-muted">{BRAND.tagline}</p>
+        </div>
+        <nav className="mt-8 flex flex-col gap-1">
+          {NAV.map(({ to, label, icon: Icon, end }) => (
+            <NavLink key={to} to={to} end={end} className={navClass}>
+              <Icon /> {label}
             </NavLink>
-            <NavLink to="/jobs" className={nav}>
-              Jobs
+          ))}
+        </nav>
+        <div className="mt-auto">
+          <AccountCard />
+        </div>
+      </aside>
+
+      <header className="sticky top-0 z-20 flex h-14 items-center gap-3 border-b border-border bg-surface/90 px-4 backdrop-blur md:hidden">
+        <Logo />
+        <nav className="flex gap-1">
+          {NAV.map(({ to, label, end }) => (
+            <NavLink key={to} to={to} end={end} className={navClass}>
+              {label}
             </NavLink>
-          </nav>
-          <div className="ml-auto">
-            <ChatGPTStatus />
-          </div>
+          ))}
+        </nav>
+        <div className="ml-auto">
+          <AccountCard compact />
         </div>
       </header>
-      <main className="mx-auto max-w-6xl px-4 py-6">
+
+      <main className="mx-auto max-w-[1400px] px-4 py-6 md:px-8 md:py-8">
         {authError && (
           <div className="mb-4">
             <Notice tone="error">{authError}</Notice>

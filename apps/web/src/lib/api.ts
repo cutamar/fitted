@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type { AuthStatus, ChatGPTModel, ImportRecord, Profile, ProfileInput, ProfileSummary } from "@rb/shared";
+import type { AuthStatus, ChatGPTModel, ImportRecord, Profile, ProfileInput } from "@rb/shared";
 
 export class ApiError extends Error {
   constructor(
@@ -54,7 +54,7 @@ export function useLogout() {
 // --- Profiles ----------------------------------------------------------------
 
 export function useProfiles() {
-  return useQuery({ queryKey: ["profiles"], queryFn: () => request<ProfileSummary[]>("/profiles") });
+  return useQuery({ queryKey: ["profiles"], queryFn: () => request<Profile[]>("/profiles") });
 }
 
 export function useProfile(id: string) {

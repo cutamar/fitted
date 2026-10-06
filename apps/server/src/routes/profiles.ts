@@ -6,7 +6,6 @@ import {
   cloneProfileData,
   newId,
   type Profile,
-  type ProfileSummary,
 } from "@rb/shared";
 import { db } from "../db.ts";
 
@@ -52,19 +51,7 @@ function insertProfile(input: z.infer<typeof ProfileInputSchema>): Profile {
 export const profileRoutes = new Hono()
   .get("/", (c) => {
     const rows = db.prepare("SELECT * FROM profiles ORDER BY updated_at DESC").all() as unknown as ProfileRow[];
-    const summaries: ProfileSummary[] = rows.map((row) => {
-      const p = fromRow(row);
-      return {
-        id: p.id,
-        name: p.name,
-        language: p.language,
-        createdAt: p.createdAt,
-        updatedAt: p.updatedAt,
-        fullName: p.data.basics.fullName,
-        sectionCount: p.data.sections.length,
-      };
-    });
-    return c.json(summaries);
+    return c.json(rows.map(fromRow));
   })
   .post("/", async (c) => {
     const input = ProfileInputSchema.parse(await c.req.json());

@@ -1,5 +1,6 @@
 import path from "node:path";
 import fs from "node:fs";
+import { BRAND } from "@rb/shared";
 
 const port = Number(process.env.PORT ?? 8787);
 
@@ -15,7 +16,7 @@ export const config = {
   dataDir: path.resolve(process.env.DATA_DIR ?? "data"),
   /** Built frontend served by the API server in production. */
   webDir: process.env.WEB_DIR ? path.resolve(process.env.WEB_DIR) : null,
-  appName: "Resume Builder",
+  appName: BRAND.name,
 };
 
 export const redirectUri = `http://127.0.0.1:${config.publicPort}/callback`;

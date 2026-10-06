@@ -1,6 +1,6 @@
-# Resume Builder
+# Fitted
 
-Local, open-source tool to tailor ATS-ready CVs to job descriptions, using your **ChatGPT Plus/Pro plan** via the official [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source) flow — no API key, no per-token billing.
+**Your CV, fitted to every job.** Local, open-source tool to tailor ATS-ready CVs to job descriptions, using your **ChatGPT Plus/Pro plan** via the official [Sign in with ChatGPT](https://developers.openai.com/siwc/token-sharing-open-source) flow — no API key, no per-token billing.
 
 Runs only on your machine. Your CVs live in a local SQLite database.
 

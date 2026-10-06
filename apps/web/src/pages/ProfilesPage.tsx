@@ -1,7 +1,9 @@
 import { useState } from "react";
+import { Copy, FilePlus2, Trash2, Upload } from "lucide-react";
 import { Link, useNavigate } from "react-router";
 import { LANGUAGES, LANGUAGE_NAMES, emptyProfileData, type Language } from "@rb/shared";
-import { Button, Card, Field, Input, Notice, Select, Spinner } from "../components/ui";
+import { CvThumbnail } from "../components/CvPreview";
+import { Badge, Button, Card, Field, Input, Notice, PageHeader, Select, Spinner } from "../components/ui";
 import { useCreateProfile, useDeleteProfile, useDuplicateProfile, useProfiles } from "../lib/api";
 
 export function ProfilesPage() {
@@ -13,73 +15,79 @@ export function ProfilesPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-xl font-semibold tracking-tight">Master profiles</h1>
-          <p className="mt-1 text-sm text-muted">
-            One complete CV per direction you apply for (e.g. Product Owner, Sales). Each job is tailored from one of them.
-          </p>
-        </div>
-        <div className="flex gap-2">
-          <Button onClick={() => setCreating(true)}>New empty profile</Button>
-          <Link to="/import">
-            <Button variant="primary">Import CV (PDF / DOCX)</Button>
-          </Link>
-        </div>
-      </div>
+      <PageHeader
+        title="Master profiles"
+        description="One complete CV per direction you apply for, e.g. DevOps and Product Owner. Every job application is tailored from one of them."
+        actions={
+          <>
+            <Button onClick={() => setCreating(true)}>
+              <FilePlus2 /> Start from scratch
+            </Button>
+            <Link to="/import">
+              <Button variant="primary">
+                <Upload /> Import CV
+              </Button>
+            </Link>
+          </>
+        }
+      />
 
       {creating && <NewProfileForm onDone={() => setCreating(false)} />}
-
       {isLoading && <Spinner className="text-muted" />}
       {error && <Notice tone="error">{(error as Error).message}</Notice>}
 
       {profiles?.length === 0 && !creating && (
-        <Card className="p-10 text-center">
-          <p className="text-sm text-muted">No profiles yet. Import your existing CV to get started.</p>
-          <Link to="/import" className="mt-4 inline-block">
+        <Card className="flex flex-col items-center px-6 py-14 text-center">
+          <div className="flex size-12 items-center justify-center rounded-full bg-accent-soft text-accent-soft-fg">
+            <Upload className="size-5" />
+          </div>
+          <h2 className="mt-4 font-semibold">Start with your current CV</h2>
+          <p className="mt-1 max-w-sm text-sm text-muted">Import a PDF or Word file. It's split into sections you can review and correct.</p>
+          <Link to="/import" className="mt-5">
             <Button variant="primary">Import CV</Button>
           </Link>
         </Card>
       )}
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {profiles?.map((p) => (
-          <Card key={p.id} className="flex flex-col p-4">
-            <div className="flex items-start justify-between gap-2">
-              <Link to={`/profiles/${p.id}`} className="font-semibold hover:underline">
-                {p.name}
-              </Link>
-              <span className="rounded bg-subtle px-1.5 py-0.5 text-xs font-medium uppercase text-muted">{p.language}</span>
-            </div>
-            <div className="mt-1 text-sm text-muted">{p.fullName || "No name set"}</div>
-            <div className="mt-1 text-xs text-muted">
-              {p.sectionCount} sections · updated {new Date(p.updatedAt).toLocaleDateString()}
-            </div>
-            <div className="mt-4 flex gap-1">
-              <Link to={`/profiles/${p.id}`}>
-                <Button size="sm">Edit</Button>
-              </Link>
-              <Button
-                size="sm"
-                variant="ghost"
-                disabled={duplicate.isPending}
-                onClick={async () => {
-                  const name = prompt("Name for the copy", `${p.name} (copy)`);
-                  if (!name) return;
-                  const copy = await duplicate.mutateAsync({ id: p.id, name });
-                  navigate(`/profiles/${copy.id}`);
-                }}
-              >
-                Duplicate
-              </Button>
-              <Button
-                size="sm"
-                variant="danger"
-                className="ml-auto"
-                onClick={() => confirm(`Delete profile "${p.name}"? This cannot be undone.`) && remove.mutate(p.id)}
-              >
-                Delete
-              </Button>
+          <Card key={p.id} className="group overflow-hidden transition hover:shadow-md">
+            <Link to={`/profiles/${p.id}`} className="block border-b border-border bg-subtle p-4">
+              <div className="overflow-hidden rounded-sm shadow-(--shadow-paper) transition group-hover:-translate-y-0.5">
+                <CvThumbnail data={p.data} language={p.language} />
+              </div>
+            </Link>
+            <div className="p-4">
+              <div className="flex items-start justify-between gap-2">
+                <Link to={`/profiles/${p.id}`} className="truncate font-semibold hover:text-accent">
+                  {p.name}
+                </Link>
+                <Badge>{p.language}</Badge>
+              </div>
+              <div className="mt-0.5 text-xs text-muted">Edited {new Date(p.updatedAt).toLocaleDateString()}</div>
+              <div className="mt-3 flex gap-1">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={duplicate.isPending}
+                  onClick={async () => {
+                    const name = prompt("Name for the copy", `${p.name} (copy)`);
+                    if (!name) return;
+                    const copy = await duplicate.mutateAsync({ id: p.id, name });
+                    navigate(`/profiles/${copy.id}`);
+                  }}
+                >
+                  <Copy /> Duplicate
+                </Button>
+                <Button
+                  size="sm"
+                  variant="danger"
+                  className="ml-auto"
+                  onClick={() => confirm(`Delete profile "${p.name}"? This cannot be undone.`) && remove.mutate(p.id)}
+                >
+                  <Trash2 />
+                </Button>
+              </div>
             </div>
           </Card>
         ))}
@@ -95,7 +103,7 @@ function NewProfileForm({ onDone }: { onDone: () => void }) {
   const navigate = useNavigate();
 
   return (
-    <Card className="p-4">
+    <Card className="p-5">
       <form
         className="flex flex-wrap items-end gap-3"
         onSubmit={async (e) => {

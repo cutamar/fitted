@@ -1,37 +1,51 @@
 @import "tailwindcss";
+@import "@fontsource-variable/inter";
 
 @theme {
-  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  --color-bg: #f6f6f4;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --color-bg: #f6f6fa;
   --color-surface: #ffffff;
-  --color-subtle: #f0f0ed;
-  --color-fg: #1c1c1a;
-  --color-muted: #6b6b66;
-  --color-border: #e2e2dd;
-  --color-accent: #1f6f5c;
+  --color-subtle: #f1f1f7;
+  --color-fg: #16162a;
+  --color-muted: #6a6a84;
+  --color-border: #e4e4ee;
+  --color-accent: #4f46e5;
+  --color-accent-hover: #4338ca;
   --color-accent-fg: #ffffff;
-  --color-danger: #b42318;
+  --color-accent-soft: #eef0ff;
+  --color-accent-soft-fg: #3f37c9;
+  --color-danger: #c4320a;
+  --color-success: #12805c;
   --color-warn-bg: #fff6e0;
   --color-warn-fg: #7a4d00;
+  --shadow-card: 0 1px 2px rgb(22 22 42 / 0.04), 0 1px 3px rgb(22 22 42 / 0.06);
+  --shadow-paper: 0 1px 3px rgb(22 22 42 / 0.08), 0 12px 32px -8px rgb(22 22 42 / 0.18);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --color-bg: #141413;
-    --color-surface: #1c1c1b;
-    --color-subtle: #252523;
-    --color-fg: #ecece8;
-    --color-muted: #9d9d97;
-    --color-border: #33332f;
-    --color-accent: #4fb89c;
-    --color-accent-fg: #0d1f1a;
-    --color-danger: #f97066;
+    --color-bg: #0f0f17;
+    --color-surface: #171722;
+    --color-subtle: #20202d;
+    --color-fg: #ededf5;
+    --color-muted: #9a9ab2;
+    --color-border: #2c2c3b;
+    --color-accent: #8b85ff;
+    --color-accent-hover: #a19cff;
+    --color-accent-fg: #0f0f17;
+    --color-accent-soft: #24223f;
+    --color-accent-soft-fg: #b9b5ff;
+    --color-danger: #ff8a65;
+    --color-success: #4cc794;
     --color-warn-bg: #3a2c0b;
     --color-warn-fg: #f5c870;
+    --shadow-card: none;
+    --shadow-paper: 0 12px 32px -8px rgb(0 0 0 / 0.6);
   }
 }
 
 body {
   background: var(--color-bg);
   color: var(--color-fg);
+  -webkit-font-smoothing: antialiased;
 }
