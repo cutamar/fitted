@@ -51,6 +51,9 @@ importers:
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
+      jszip:
+        specifier: 3.10.2
+        version: 3.10.2
       tsx:
         specifier: ^4.23.15
         version: 4.23.15

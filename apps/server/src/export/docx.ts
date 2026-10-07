@@ -10,6 +10,7 @@ import {
   LevelFormat,
   Packer,
   Paragraph,
+  Tab,
   TabStopType,
   TextRun,
 } from "docx";
@@ -31,7 +32,8 @@ function entryHeader(item: Item, language: Language): Paragraph[] {
       keepNext: true,
       spacing: { before: 120 },
       tabStops: [{ type: TabStopType.RIGHT, position: CONTENT_WIDTH }],
-      children: [new TextRun({ text: item.title, bold: true }), ...(dates ? [new TextRun({ text: `\t${dates}`, color: MUTED, size: pt(9.5) })] : [])],
+      // A real <w:tab/> jumps to the right-aligned tab stop; a "\t" inside the text is ignored by Word.
+      children: [new TextRun({ text: item.title, bold: true }), ...(dates ? [new TextRun({ children: [new Tab(), dates], color: MUTED, size: pt(9.5) })] : [])],
     }),
   ];
   const sub = [item.subtitle, item.location].filter(Boolean).join(" | ");

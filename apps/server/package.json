@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
+    "jszip": "3.10.2",
     "tsx": "^4.23.15"
   }
 }

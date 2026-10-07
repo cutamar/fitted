@@ -61,3 +61,12 @@ describe("export ATS check", () => {
     expect(report.missing.map((m) => m.label)).toEqual(["Email"]);
   });
 });
+
+describe("DOCX entry header", () => {
+  it("separates title and dates with a real Word tab, not a tab character in the text", async () => {
+    const JSZip = (await import("jszip")).default;
+    const xml = await (await JSZip.loadAsync(await renderDocx(data, "de"))).file("word/document.xml")!.async("string");
+    expect(xml).toMatch(/DevOps Engineer<\/w:t><\/w:r><w:r>(<w:rPr>.*?<\/w:rPr>)?<w:tab\/><w:t[^>]*>März 2021 – heute<\/w:t>/);
+    expect(xml).not.toContain("\tMärz");
+  });
+});
