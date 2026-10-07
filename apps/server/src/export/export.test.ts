@@ -70,3 +70,28 @@ describe("DOCX entry header", () => {
     expect(xml).not.toContain("\tMärz");
   });
 });
+
+describe("DOCX skills section", () => {
+  it("exports skill groups written as text, not only tag lists", async () => {
+    const withText: ProfileData = {
+      ...data,
+      sections: [
+        ...data.sections,
+        {
+          id: "s3",
+          kind: "skills",
+          title: "Kenntnisse",
+          hidden: false,
+          items: [
+            { ...emptyItem(), title: "Generative AI", content: [newBlock("text", "Applied AI across research and content."), newBlock("bullet", "Prompt design")] },
+            { ...emptyItem(), title: "Tools", tags: ["Figma", "Jira"] },
+          ],
+        },
+      ],
+    };
+    const report = await checkExport("docx", await renderDocx(withText, "de"), withText, "de");
+    expect(report.missing).toEqual([]);
+    expect(report.text).toContain("Generative AI: Applied AI across research and content.");
+    expect(report.text).toContain("Tools: Figma, Jira");
+  });
+});

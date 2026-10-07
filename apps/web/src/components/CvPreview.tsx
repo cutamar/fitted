@@ -50,7 +50,21 @@ function itemMark(changes: ChangeSet | null, item: Item): string | undefined {
   }
 }
 
-function buildUnits(data: ProfileData, language: Language, changes: ChangeSet | null): Unit[] {
+/**
+ * Curly apostrophes (’ ‘) become a plain ' on the rendered CV. With our font,
+ * Chromium's PDF maps ’ to "ʼ" (a modifier letter), which ATS parsers can treat
+ * as part of the word ("GNSDʼs" no longer matches "GNSD"). Editor text is untouched.
+ */
+function plainApostrophes<T>(value: T): T {
+  if (typeof value === "string") return value.replace(/[\u2018\u2019\u02BC]/g, "'") as T;
+  if (Array.isArray(value)) return value.map(plainApostrophes) as T;
+  if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([k, v]) => [k, plainApostrophes(v)])) as T;
+  return value;
+}
+
+function buildUnits(rawData: ProfileData, language: Language, rawChanges: ChangeSet | null): Unit[] {
+  const data = plainApostrophes(rawData);
+  const changes = plainApostrophes(rawChanges);
   const { basics } = data;
   const units: Unit[] = [];
   const contact = [basics.location, basics.phone, basics.email, ...basics.links.map((l) => l.url)].filter(Boolean);
@@ -98,20 +112,44 @@ function buildUnits(data: ProfileData, language: Language, changes: ChangeSet | 
 
 function sectionUnits(section: Section, items: Item[], language: Language, changes: ChangeSet | null, units: Unit[]) {
   if (section.kind === "skills") {
-    items.forEach((i, idx) =>
+    items.forEach((i, idx) => {
+      // "Group: tags", or "Group: first paragraph" for groups written as text; never drop content.
+      const blocks = i.content.filter((b) => b.text.trim());
+      const inline = !i.tags.length && blocks[0]?.type === "text" ? blocks[0] : null;
       units.push({
         key: i.id,
         pad: idx === 0 ? 6 : 2,
-        sug: changes?.sources[`tags:${i.id}`] ?? changes?.sources[i.id],
+        sug: changes?.sources[`tags:${i.id}`] ?? (inline && changes?.sources[inline.id]) ?? changes?.sources[i.id],
         className: itemMark(changes, i),
         node: (
           <p>
             {i.title && <span className="font-semibold">{i.title}: </span>}
-            <Tags item={i} />
+            {inline ? <BlockText block={inline} changes={changes} /> : <Tags item={i} />}
           </p>
         ),
-      }),
-    );
+      });
+      for (const b of blocks) {
+        if (b === inline) continue;
+        units.push({
+          key: b.id,
+          pad: 2,
+          sug: changes?.sources[b.id],
+          className: itemMark(changes, i),
+          node:
+            b.type === "bullet" ? (
+              <ul className="ml-4 list-disc marker:text-[#7a7a90]">
+                <li className="pl-0.5">
+                  <BlockText block={b} changes={changes} />
+                </li>
+              </ul>
+            ) : (
+              <p className="whitespace-pre-line">
+                <BlockText block={b} changes={changes} />
+              </p>
+            ),
+        });
+      }
+    });
     return;
   }
   if (section.kind === "languages") {
@@ -192,7 +230,8 @@ function sectionUnits(section: Section, items: Item[], language: Language, chang
 }
 
 function Tags({ item }: { item: Item }) {
-  const before = useContext(ChangesContext)?.tags[item.id];
+  const raw = useContext(ChangesContext)?.tags[item.id];
+  const before = raw && plainApostrophes(raw);
   return before ? <TagsDiff paper before={before} after={item.tags} /> : <>{item.tags.join(", ")}</>;
 }
 

@@ -55,9 +55,17 @@ function blocks(content: Block[]): Paragraph[] {
 function sectionBody(section: Section, language: Language): Paragraph[] {
   const items = section.items.filter((i) => !i.hidden);
   if (section.kind === "skills") {
-    return items.map(
-      (i) => new Paragraph({ children: [...(i.title ? [new TextRun({ text: `${i.title}: `, bold: true })] : []), new TextRun(i.tags.join(", "))] }),
-    );
+    // Same rule as the PDF: "Group: tags" or "Group: first paragraph", then any further blocks.
+    return items.flatMap((i) => {
+      const content = i.content.filter((b) => b.text.trim());
+      const inline = !i.tags.length && content[0]?.type === "text" ? content[0] : null;
+      return [
+        new Paragraph({
+          children: [...(i.title ? [new TextRun({ text: `${i.title}: `, bold: true })] : []), new TextRun(inline ? inline.text : i.tags.join(", "))],
+        }),
+        ...blocks(content.filter((b) => b !== inline)),
+      ];
+    });
   }
   if (section.kind === "languages") {
     return [new Paragraph({ children: [new TextRun(items.map((i) => (i.subtitle ? `${i.title} (${i.subtitle})` : i.title)).join("  ·  "))] })];
