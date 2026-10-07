@@ -394,7 +394,7 @@ export async function suggestForKeywords(
   const out = await generateJson(z.object({ suggestions: z.array(ModelSuggestion) }), {
     name: "cv_keywords_suggestions",
     instructions: `The user wants their CV to cover these job keywords: ${keywords.join(", ")}. Propose the fewest natural edits that cover ALL of them (at most ${keywords.length}).
-- Tools/skills without a story: one set_tags on the most relevant skills group or entry (its current tags in order, plus the new ones placed by relevance). Several keywords can share that one set_tags.
+- Tools/skills without a story: one set_tags on the most relevant skills group or entry: its current tags, with the new ones placed by relevance to the job (most relevant first), not just appended. Don't add a keyword that duplicates an existing tag in other words. Several keywords can share that one set_tags.
 - Keywords tied to concrete work: weave them into an existing related bullet or paragraph (rewrite_block, keep everything else, including numbers) or add one bullet (insert_block) in the most relevant entry.
 ${where ? `- The user wants them in entry [${where}]. Use that entry (or its blocks).` : ""}
 - Facts: use the CV and the user's statement below. The user's statement is confirmed true, and so is the user's choice to add these keywords: do not list them in newClaims. Anything beyond that goes into newClaims.

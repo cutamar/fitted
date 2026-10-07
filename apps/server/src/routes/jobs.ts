@@ -1,6 +1,6 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { AppStatusSchema, computeScore, newId, unsupportedClaims, CreateJobSchema, SuggestionSchema, SuggestionStatusSchema, type Suggestion, acceptedKey, applySuggestions, tailoredData, type Job } from "@rb/shared";
+import { AppStatusSchema, computeScore, newId, unsupportedClaims, CreateJobSchema, SuggestionStatusSchema, type Suggestion, acceptedKey, applySuggestions, tailoredData, type Job } from "@rb/shared";
 import { assess, analyzeJob, assessAndSuggest, boostQuestions, boostSuggestions, regenerateSuggestion, suggestForGap, suggestForKeywords, writeCoverLetter, type BoostGap } from "../jobs/job-ai.ts";
 import { deleteJob, failInterruptedJobs, getJob, insertJob, listJobs, updateJob } from "../jobs/store.ts";
 import { HttpError } from "../errors.ts";
@@ -174,23 +174,8 @@ export const jobRoutes = new Hono()
     if (!req && !keywords.length) return c.json({ error: "Pick a requirement or at least one keyword." }, 400);
 
     let added: Suggestion[] = [];
-    const target = body.itemId ? current.sections.flatMap((s) => s.items).find((i) => i.id === body.itemId) : undefined;
-    if (!req && target && !body.details.trim()) {
-      // Keywords into a chosen tag list with no extra story: append directly, no ChatGPT call needed.
-      const have = new Set(target.tags.map((t) => t.toLowerCase()));
-      const fresh = keywords.filter((k) => !have.has(k.toLowerCase()));
-      if (!fresh.length) return c.json({ error: "Those keywords are already in that list." }, 409);
-      added = [
-        SuggestionSchema.parse({
-          id: newId(),
-          type: "set_tags",
-          itemId: target.id,
-          tags: [...target.tags, ...fresh],
-          rationale: `Adds ${fresh.join(", ")} where you chose.`,
-          confirmedFacts: `User added: ${fresh.join(", ")}`,
-        }),
-      ];
-    } else if (!req && keywords.length > 1) {
+    // Always through ChatGPT: it picks the right place and the order within a list.
+    if (!req && keywords.length > 1) {
       added = await suggestForKeywords(current, job.analysis, job.language, keywords, body.details, body.itemId);
     } else {
       const s = await suggestForGap(current, job.analysis, job.language, {

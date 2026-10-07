@@ -36,7 +36,7 @@ export function AddToCvForm({ job, target, onAdded, onCancel }: { job: Job; targ
         className="text-sm"
         placeholder={
           "keywords" in target
-            ? "Optional: what's true about these? e.g. “Used Amplitude and Mixpanel daily for funnel analysis at Northwind Labs.” To just add them to a skills list, leave this empty and pick the list below."
+            ? "Optional: what's true about these? e.g. “Used Amplitude and Mixpanel daily for funnel analysis at Northwind Labs.”"
             : "What's true about this? e.g. “Set up Prometheus and Grafana dashboards for our Kubernetes clusters at Northwind Labs.” Leave empty to only use what your CV already says."
         }
         value={details}
@@ -61,7 +61,7 @@ export function AddToCvForm({ job, target, onAdded, onCancel }: { job: Job; targ
         </span>
       </div>
       {"keywords" in target && !details.trim() && (
-        <p className="text-[11px] text-muted">Tip: pick a skills list under “Where” and leave the text empty to add them to that list instantly.</p>
+        <p className="text-[11px] text-muted">Tip: to put them in your skills list, pick it under “Where”. ChatGPT places them in a sensible order.</p>
       )}
       {add.error && <Notice tone="error">{(add.error as Error).message}</Notice>}
     </div>
