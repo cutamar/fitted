@@ -4,7 +4,7 @@ import type { Job, ProfileData } from "@rb/shared";
 import { useAddToCv, type AddToCvInput } from "../lib/api";
 import { Button, Notice, Select, Spinner, Textarea } from "./ui";
 
-export type AddTarget = { requirementId: string; label: string } | { keyword: string; label: string };
+export type AddTarget = { requirementId: string; label: string } | { keywords: string[]; label: string };
 
 function entryOptions(base: ProfileData) {
   return base.sections.flatMap((s) =>
@@ -22,17 +22,23 @@ export function AddToCvForm({ job, target, onAdded, onCancel }: { job: Job; targ
   const [itemId, setItemId] = useState("");
 
   const submit = () => {
-    const input: AddToCvInput = { details, itemId: itemId || undefined, ...("requirementId" in target ? { requirementId: target.requirementId } : { keyword: target.keyword }) };
+    const input: AddToCvInput = { details, itemId: itemId || undefined, ...("requirementId" in target ? { requirementId: target.requirementId } : { keywords: target.keywords }) };
     add.mutate(input, { onSuccess: ({ suggestionId }) => onAdded(suggestionId) });
   };
 
   return (
     <div className="mt-2 flex flex-col gap-2 rounded-lg border border-accent/30 bg-accent-soft/40 p-3">
-      <div className="text-sm font-medium">Add “{target.label}” to your CV</div>
+      <div className="text-sm font-medium">
+        {"keywords" in target && target.keywords.length > 1 ? `Add ${target.keywords.length} keywords to your CV: ${target.label}` : `Add “${target.label}” to your CV`}
+      </div>
       <Textarea
         autoFocus
         className="text-sm"
-        placeholder="What's true about this? e.g. “Set up Prometheus and Grafana dashboards for our Kubernetes clusters at Northwind Labs.” Leave empty to only use what your CV already says."
+        placeholder={
+          "keywords" in target
+            ? "Optional: what's true about these? e.g. “Used Amplitude and Mixpanel daily for funnel analysis at Northwind Labs.” To just add them to a skills list, leave this empty and pick the list below."
+            : "What's true about this? e.g. “Set up Prometheus and Grafana dashboards for our Kubernetes clusters at Northwind Labs.” Leave empty to only use what your CV already says."
+        }
         value={details}
         onChange={(e) => setDetails(e.target.value)}
       />
@@ -54,6 +60,9 @@ export function AddToCvForm({ job, target, onAdded, onCancel }: { job: Job; targ
           </Button>
         </span>
       </div>
+      {"keywords" in target && !details.trim() && (
+        <p className="text-[11px] text-muted">Tip: pick a skills list under “Where” and leave the text empty to add them to that list instantly.</p>
+      )}
       {add.error && <Notice tone="error">{(add.error as Error).message}</Notice>}
     </div>
   );

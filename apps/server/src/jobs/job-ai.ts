@@ -377,3 +377,36 @@ export async function boostSuggestions(data: ProfileData, analysis: JobAnalysis,
   // Hard cap in case the model over-edits: these are accepted without review.
   return result.slice(0, facts.length * 2);
 }
+
+// --- 8. Several keywords at once ----------------------------------------------------------
+
+/** Places several keywords with as few natural edits as possible (at most one per keyword). */
+export async function suggestForKeywords(
+  data: ProfileData,
+  analysis: JobAnalysis,
+  language: Language,
+  keywords: string[],
+  details: string,
+  itemId?: string,
+): Promise<Suggestion[]> {
+  const cv = cvForModel(data);
+  const where = itemId ? cv.shortIdOf(itemId) : "";
+  const out = await generateJson(z.object({ suggestions: z.array(ModelSuggestion) }), {
+    name: "cv_keywords_suggestions",
+    instructions: `The user wants their CV to cover these job keywords: ${keywords.join(", ")}. Propose the fewest natural edits that cover ALL of them (at most ${keywords.length}).
+- Tools/skills without a story: one set_tags on the most relevant skills group or entry (its current tags in order, plus the new ones placed by relevance). Several keywords can share that one set_tags.
+- Keywords tied to concrete work: weave them into an existing related bullet or paragraph (rewrite_block, keep everything else, including numbers) or add one bullet (insert_block) in the most relevant entry.
+${where ? `- The user wants them in entry [${where}]. Use that entry (or its blocks).` : ""}
+- Facts: use the CV and the user's statement below. The user's statement is confirmed true, and so is the user's choice to add these keywords: do not list them in newClaims. Anything beyond that goes into newClaims.
+
+${TAILOR_RULES(language)}
+
+SCOPE (overrides the suggestion count above): only edits needed for these keywords, nothing else.`,
+    input: `JOB\n${describeAnalysis(analysis)}\n\nKEYWORDS TO COVER\n${keywords.join("\n")}\n\nUSER'S STATEMENT (true)\n${details.trim() || "(none)"}\n\nCV\n${cv.text}`,
+  });
+  return out.suggestions
+    .map((m) => toSuggestion(m, cv.resolve))
+    .filter((s): s is Suggestion => s !== null)
+    .slice(0, keywords.length)
+    .map((s) => ({ ...s, confirmedFacts: `User added: ${keywords.join(", ")}${details.trim() ? `\n${details.trim()}` : ""}` }));
+}

@@ -235,6 +235,7 @@ export async function downloadFile(url: string): Promise<void> {
 export interface AddToCvInput {
   requirementId?: string;
   keyword?: string;
+  keywords?: string[];
   details: string;
   itemId?: string;
 }

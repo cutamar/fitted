@@ -151,6 +151,12 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
     [job.suggestions, base, analysis, contexts],
   );
   const [boostOpen, setBoostOpen] = useState(false);
+  // Missing keywords an open (not yet accepted) suggestion would add: shown separately to avoid adding them twice.
+  const pendingCovered = useMemo(() => {
+    const withOpen = computeScore(applySuggestions(base, job.suggestions.filter((s) => s.status !== "rejected")).data, analysis, job.assessment);
+    const covered = new Set(withOpen.keywords.matched.map((k) => k.term));
+    return currentScore.keywords.missing.map((k) => k.term).filter((t) => covered.has(t));
+  }, [base, job.suggestions, analysis, job.assessment, currentScore]);
 
   const preview = useMemo(
     () =>
@@ -254,7 +260,7 @@ function Workspace({ job, analysis, base }: { job: Job; analysis: JobAnalysis; b
 
         {tab === "letter" && <CoverLetterTab job={job} />}
         {tab === "requirements" && <RequirementsTab job={job} analysis={analysis} onAdded={showNew} />}
-        {tab === "keywords" && <KeywordsTab job={job} onAdded={showNew} matched={currentScore.keywords.matched.map((k) => k.term)} missing={currentScore.keywords.missing.map((k) => k.term)} analysis={analysis} />}
+        {tab === "keywords" && <KeywordsTab job={job} onAdded={showNew} pendingCovered={pendingCovered} matched={currentScore.keywords.matched.map((k) => k.term)} missing={currentScore.keywords.missing.map((k) => k.term)} analysis={analysis} />}
         {tab === "ad" && (
           <Card className="p-5">
             <pre className="font-sans text-sm leading-relaxed whitespace-pre-wrap">{job.description}</pre>
@@ -344,24 +350,42 @@ function RequirementsTab({ job, analysis, onAdded }: { job: Job; analysis: JobAn
   );
 }
 
-function KeywordsTab({ job, matched, missing, analysis, onAdded }: { job: Job; matched: string[]; missing: string[]; analysis: JobAnalysis; onAdded: (sid: string) => void }) {
-  const [open, setOpen] = useState<string | null>(null);
+function KeywordsTab({
+  job,
+  matched,
+  missing: allMissing,
+  pendingCovered,
+  analysis,
+  onAdded,
+}: {
+  job: Job;
+  matched: string[];
+  missing: string[];
+  pendingCovered: string[];
+  analysis: JobAnalysis;
+  onAdded: (sid: string) => void;
+}) {
+  const missing = allMissing.filter((t) => !pendingCovered.includes(t));
+  const [selected, setSelected] = useState<string[]>([]);
   const byTerm = new Map(analysis.keywords.map((k) => [k.term, k]));
+  const toggle = (term: string) => setSelected((sel) => (sel.includes(term) ? sel.filter((t) => t !== term) : [...sel, term]));
   const chip = (term: string, ok: boolean) => {
     const k = byTerm.get(term);
+    const on = selected.includes(term);
     return (
       <button
         type="button"
         key={term}
         disabled={ok}
-        onClick={() => setOpen(term)}
-        title={ok ? (k?.variants.length ? `Also matches: ${k.variants.join(", ")}` : undefined) : "Add to CV"}
+        aria-pressed={ok ? undefined : on}
+        onClick={() => toggle(term)}
+        title={ok ? (k?.variants.length ? `Also matches: ${k.variants.join(", ")}` : undefined) : on ? "Selected: click to unselect" : "Select to add to your CV"}
         className={cx(
           "inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition",
-          ok ? "bg-success/12 text-success" : open === term ? "bg-accent text-accent-fg" : "bg-subtle text-muted hover:bg-accent-soft hover:text-accent-soft-fg",
+          ok ? "bg-success/12 text-success" : on ? "bg-accent text-accent-fg" : "bg-subtle text-muted hover:bg-accent-soft hover:text-accent-soft-fg",
         )}
       >
-        {ok ? <Check className="size-3" /> : <Plus className="size-3" />}
+        {ok || on ? <Check className="size-3" /> : <Plus className="size-3" />}
         {term}
         {k?.importance === "high" && <span className="opacity-60">★</span>}
       </button>
@@ -370,14 +394,52 @@ function KeywordsTab({ job, matched, missing, analysis, onAdded }: { job: Job; m
   return (
     <Card className="flex flex-col gap-4 p-5">
       <p className="text-xs text-muted">
-        Keywords an ATS scans for, matched against your tailored CV (with accepted suggestions). ★ = high importance. Click a missing keyword to add it, but only
-        if it's true.
+        Keywords an ATS scans for, matched against your tailored CV (with accepted suggestions). ★ = high importance. Select one or more missing keywords to add
+        them, but only if they're true.
       </p>
       <div>
-        <div className="mb-2 text-sm font-semibold">Missing ({missing.length})</div>
+        <div className="mb-2 flex items-center gap-2">
+          <span className="text-sm font-semibold">Missing ({missing.length})</span>
+          {missing.length > 1 && (
+            <button type="button" className="text-xs font-medium text-accent" onClick={() => setSelected(selected.length === missing.length ? [] : missing)}>
+              {selected.length === missing.length ? "Clear selection" : "Select all"}
+            </button>
+          )}
+          {selected.length > 0 && selected.length < missing.length && (
+            <button type="button" className="text-xs text-muted hover:text-fg" onClick={() => setSelected([])}>
+              Clear ({selected.length})
+            </button>
+          )}
+        </div>
         <div className="flex flex-wrap gap-1.5">{missing.map((t) => chip(t, false))}</div>
-        {open && <AddToCvForm key={open} job={job} target={{ keyword: open, label: open }} onAdded={onAdded} onCancel={() => setOpen(null)} />}
+        {selected.length > 0 && (
+          <AddToCvForm
+            job={job}
+            target={{ keywords: selected, label: selected.join(", ") }}
+            onAdded={(sid) => {
+              setSelected([]);
+              onAdded(sid);
+            }}
+            onCancel={() => setSelected([])}
+          />
+        )}
       </div>
+      {pendingCovered.length > 0 && (
+        <div>
+          <div className="mb-2 text-sm font-semibold">In open suggestions ({pendingCovered.length})</div>
+          <div className="flex flex-wrap gap-1.5">
+            {pendingCovered.map((t) => (
+              <span
+                key={t}
+                title="An open suggestion adds this. Accept it in the Suggestions tab."
+                className="inline-flex items-center gap-1 rounded-md border border-dashed border-accent/50 px-2 py-1 text-xs font-medium text-accent-soft-fg"
+              >
+                {t}
+              </span>
+            ))}
+          </div>
+        </div>
+      )}
       <div>
         <div className="mb-2 text-sm font-semibold">Found ({matched.length})</div>
         <div className="flex flex-wrap gap-1.5">{matched.map((t) => chip(t, true))}</div>

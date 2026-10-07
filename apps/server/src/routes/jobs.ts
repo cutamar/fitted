@@ -1,7 +1,7 @@
 import { Hono, type Context } from "hono";
 import { z } from "zod";
-import { AppStatusSchema, computeScore, newId, unsupportedClaims, CreateJobSchema, SuggestionStatusSchema, acceptedKey, applySuggestions, tailoredData, type Job } from "@rb/shared";
-import { assess, analyzeJob, assessAndSuggest, boostQuestions, boostSuggestions, regenerateSuggestion, suggestForGap, writeCoverLetter, type BoostGap } from "../jobs/job-ai.ts";
+import { AppStatusSchema, computeScore, newId, unsupportedClaims, CreateJobSchema, SuggestionSchema, SuggestionStatusSchema, type Suggestion, acceptedKey, applySuggestions, tailoredData, type Job } from "@rb/shared";
+import { assess, analyzeJob, assessAndSuggest, boostQuestions, boostSuggestions, regenerateSuggestion, suggestForGap, suggestForKeywords, writeCoverLetter, type BoostGap } from "../jobs/job-ai.ts";
 import { deleteJob, failInterruptedJobs, getJob, insertJob, listJobs, updateJob } from "../jobs/store.ts";
 import { HttpError } from "../errors.ts";
 import { getProfile } from "./profiles.ts";
@@ -159,22 +159,52 @@ export const jobRoutes = new Hono()
     const job = requireJob(c.req.param("id"));
     if (!job.analysis || !job.base) return c.json({ error: "Analyze the job first." }, 409);
     const body = z
-      .object({ requirementId: z.string().optional(), keyword: z.string().optional(), details: z.string().default(""), itemId: z.string().optional() })
+      .object({
+        requirementId: z.string().optional(),
+        keyword: z.string().optional(),
+        keywords: z.array(z.string().trim().min(1)).optional(),
+        details: z.string().default(""),
+        itemId: z.string().optional(),
+      })
       .parse(await c.req.json());
-    const req = body.requirementId ? job.analysis.requirements.find((r) => r.id === body.requirementId) : undefined;
-    const label = req?.text ?? body.keyword;
-    if (!label) return c.json({ error: "Pick a requirement or keyword." }, 400);
     // Against the tailored CV, so it builds on accepted changes instead of undoing them.
-    const s = await suggestForGap(tailoredData(job.base, job.suggestions), job.analysis, job.language, {
-      label,
-      kind: req ? "requirement" : "keyword",
-      requirementId: req?.id,
-      details: body.details,
-      itemId: body.itemId,
-    });
-    if (!s) return c.json({ error: "ChatGPT couldn't place it. Try adding a sentence about where you used it." }, 502);
+    const current = tailoredData(job.base, job.suggestions);
+    const req = body.requirementId ? job.analysis.requirements.find((r) => r.id === body.requirementId) : undefined;
+    const keywords = [...new Set([...(body.keywords ?? []), ...(body.keyword ? [body.keyword] : [])])];
+    if (!req && !keywords.length) return c.json({ error: "Pick a requirement or at least one keyword." }, 400);
+
+    let added: Suggestion[] = [];
+    const target = body.itemId ? current.sections.flatMap((s) => s.items).find((i) => i.id === body.itemId) : undefined;
+    if (!req && target && !body.details.trim()) {
+      // Keywords into a chosen tag list with no extra story: append directly, no ChatGPT call needed.
+      const have = new Set(target.tags.map((t) => t.toLowerCase()));
+      const fresh = keywords.filter((k) => !have.has(k.toLowerCase()));
+      if (!fresh.length) return c.json({ error: "Those keywords are already in that list." }, 409);
+      added = [
+        SuggestionSchema.parse({
+          id: newId(),
+          type: "set_tags",
+          itemId: target.id,
+          tags: [...target.tags, ...fresh],
+          rationale: `Adds ${fresh.join(", ")} where you chose.`,
+          confirmedFacts: `User added: ${fresh.join(", ")}`,
+        }),
+      ];
+    } else if (!req && keywords.length > 1) {
+      added = await suggestForKeywords(current, job.analysis, job.language, keywords, body.details, body.itemId);
+    } else {
+      const s = await suggestForGap(current, job.analysis, job.language, {
+        label: req?.text ?? keywords[0]!,
+        kind: req ? "requirement" : "keyword",
+        requirementId: req?.id,
+        details: body.details,
+        itemId: body.itemId,
+      });
+      if (s) added = [s];
+    }
+    if (!added.length) return c.json({ error: "ChatGPT couldn't place it. Try adding a sentence about where you used it." }, 502);
     const fresh = requireJob(job.id);
-    return c.json({ job: updateJob(job.id, { suggestions: [...fresh.suggestions, s] }), suggestionId: s.id });
+    return c.json({ job: updateJob(job.id, { suggestions: [...fresh.suggestions, ...added] }), suggestionId: added[0]!.id, suggestionIds: added.map((s) => s.id) });
   })
   /** Quick boost, step 1: yes/no questions for the biggest remaining gaps. */
   .post("/:id/boost", async (c) => {
